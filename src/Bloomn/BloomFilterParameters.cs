@@ -7,7 +7,7 @@ namespace Bloomn
     {
         public BloomFilterDimensions Dimensions { get; init; } = new BloomFilterDimensions();
 
-        public ScalingParameters ScalingParameters { get; init; } = new ScalingParameters()
+        public BloomFilterScaling Scaling { get; init; } = new BloomFilterScaling()
         {
             MaxCapacityBehavior = MaxCapacityBehavior.Throw,
         };
@@ -26,11 +26,11 @@ namespace Bloomn
         {
             return this with
             {
-                ScalingParameters = new ScalingParameters()
+                Scaling = new BloomFilterScaling()
                 {
                     MaxCapacityBehavior = MaxCapacityBehavior.Scale,
                     CapacityScaling = capacityScaling,
-                    ErrorRateScaling = errorRateScaling
+                    FalsePositiveProbabilityScaling = errorRateScaling
                 }
             };
         }
@@ -39,27 +39,27 @@ namespace Bloomn
         {
             if (string.IsNullOrEmpty(HashAlgorithm))
             {
-                throw new ValidationException($"{nameof(HashAlgorithm)} must be set.");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, $"{nameof(HashAlgorithm)} must be set.");
             }
 
-            if (ScalingParameters == null)
+            if (Scaling == null)
             {
-                throw new ValidationException($"{nameof(ScalingParameters)} must be set;");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, $"{nameof(Scaling)} must be set;");
             }
 
             if (Dimensions == null)
             {
-                throw new ValidationException($"{nameof(Dimensions)} must be set;");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, $"{nameof(Dimensions)} must be set;");
             }
 
             Dimensions.Validate();
-            ScalingParameters.Validate();
+            Scaling.Validate();
         }
 
         public List<string> Diff(BloomFilterParameters other)
         {
             var diff = Dimensions.Diff(other.Dimensions);
-            diff.AddRange(ScalingParameters.ValidateMigration(other.ScalingParameters));
+            diff.AddRange(Scaling.Diff(other.Scaling));
 
             if (HashAlgorithm != other.HashAlgorithm)
             {

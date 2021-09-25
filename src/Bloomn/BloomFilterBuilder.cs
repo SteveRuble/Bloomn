@@ -58,11 +58,11 @@ namespace Bloomn
 
         public IBloomFilterBuilder WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8)
         {
-            Options.ScalingParameters = new ScalingParameters()
+            Options.BloomFilterScaling = new BloomFilterScaling()
             {
                 MaxCapacityBehavior = MaxCapacityBehavior.Scale,
                 CapacityScaling = capacityScaling,
-                ErrorRateScaling = errorRateScaling
+                FalsePositiveProbabilityScaling = errorRateScaling
             };
             return this;
         }
@@ -113,12 +113,12 @@ namespace Bloomn
         
         public IBloomFilter Build()
         {
-            var id = State?.Id ?? Guid.NewGuid().ToString();
+            var id = State?.Parameters?.Id ?? Guid.NewGuid().ToString();
 
             var configuredParameters = new BloomFilterParameters(id)
             {
                 Dimensions = Options.Dimensions,
-                ScalingParameters = Options.ScalingParameters,
+                Scaling = Options.BloomFilterScaling,
                 HashAlgorithm = Options.GetHasher().Algorithm,
             };
 
@@ -158,7 +158,7 @@ namespace Bloomn
                 throw new Exception("State parameters not found.");
             }
 
-            if (state.Parameters.ScalingParameters.MaxCapacityBehavior == MaxCapacityBehavior.Scale)
+            if (state.Parameters.Scaling.MaxCapacityBehavior == MaxCapacityBehavior.Scale)
             {
                 return new ScalingBloomFilter(Options, state);
             }

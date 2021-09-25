@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
@@ -14,7 +15,7 @@ namespace Bloomn.Tests
 
         public override IBloomFilter Create(BloomFilterOptions options, BloomFilterParameters parameters)
         {
-            parameters = parameters.WithScaling(4, 0.8);
+            parameters = parameters.WithScaling(2, 0.8);
             
             return new ScalingBloomFilter(options, new BloomFilterState()
             {
@@ -85,5 +86,41 @@ namespace Bloomn.Tests
             );
         }    
 
+        
+        [Fact]
+        public void CanExportAndImportState()
+        {
+            var parameters = new BloomFilterParameters("test")
+                .WithCapacityAndErrorRate(100, 0.1)
+                .WithScaling();
+
+            var first = new ScalingBloomFilter(new BloomFilterOptions()
+            {
+                Callbacks = new Callbacks()
+                {
+                    OnScaled = (id,p) => TestOutputHelper.WriteLine($"{id} {p}")
+                }
+            }, parameters);
+            
+            // Populate with data
+            ChartFalsePositiveRates(parameters, () => first, RandomStrings, 10000, 100, 1000);
+
+            var firstState = first.GetState();
+
+            var serializedFirstState = firstState.Serialize();
+
+            var secondState = BloomFilterState.Deserialize(serializedFirstState);
+
+            var second = new ScalingBloomFilter(secondState);
+            
+            second.Parameters.Should().BeEquivalentTo(first.Parameters);
+
+            second.Count.Should().Be(first.Count);
+
+            var fpr = GetFalsePositiveRate(second, 10000);
+
+            fpr.Should().BeGreaterThan(0, "there should be some false positives");
+            fpr.Should().BeLessOrEqualTo(parameters.Dimensions.ErrorRate, "the filter should behave correctly");
+        }    
     }
 }

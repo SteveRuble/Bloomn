@@ -13,7 +13,7 @@ namespace Bloomn
 
         public BloomFilterDimensions Dimensions { get; set; } = new BloomFilterDimensions();
 
-        public ScalingParameters ScalingParameters { get; set; } = new ScalingParameters();
+        public BloomFilterScaling BloomFilterScaling { get; set; } = new BloomFilterScaling();
 
         public Callbacks Callbacks { get; set; } = new Callbacks();
 

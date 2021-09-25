@@ -24,7 +24,7 @@ namespace Bloomn
             return this;
         }
 
-        public BloomFilterConfigurationBuilder AddProfile(string name, Action<IBloomFilterOptionsBuilder> configureOptions)
+        public BloomFilterConfigurationBuilder WithProfile(string name, Action<IBloomFilterOptionsBuilder> configureOptions)
         {
             ServiceCollection.Configure<BloomFilterOptions>(name, options =>
             {

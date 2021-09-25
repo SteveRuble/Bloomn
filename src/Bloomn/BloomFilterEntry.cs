@@ -11,7 +11,7 @@ namespace Bloomn
         public readonly bool IsNotPresent;
         public readonly PreparedAdd PreparedAdd;
 
-        internal BloomFilterEntry(bool isNotPresent, PreparedAdd preparedAdd)
+        private BloomFilterEntry(bool isNotPresent, PreparedAdd preparedAdd)
         {
             IsNotPresent = isNotPresent;
             PreparedAdd = preparedAdd;

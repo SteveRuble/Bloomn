@@ -15,7 +15,7 @@ namespace Bloomn.Tests
 {
     public abstract class BloomFilterTestsBase
     {
-        private readonly ITestOutputHelper _testOutputHelper;
+        public readonly ITestOutputHelper TestOutputHelper;
 
         protected static IEnumerable<string> PredictableStrings(int count)
         {
@@ -43,7 +43,7 @@ namespace Bloomn.Tests
 
         protected BloomFilterTestsBase(ITestOutputHelper testOutputHelper)
         {
-            _testOutputHelper = testOutputHelper;
+            TestOutputHelper = testOutputHelper;
 
 
             Options = new BloomFilterOptions()
@@ -141,6 +141,22 @@ namespace Bloomn.Tests
                 sampleInterval
             );
         }
+
+        public double GetFalsePositiveRate(IBloomFilter bloomFilter, int sampleSize)
+        {
+            var keys = RandomStrings(sampleSize).ToList();
+            var falsePositiveCount = 0;
+            foreach (var sampleKey in keys)
+            {
+                if (!bloomFilter.IsNotPresent(sampleKey))
+                {
+                    falsePositiveCount++;
+                }
+            }
+
+            var fpr = falsePositiveCount / (double) sampleSize;
+            return fpr;
+        }
         
         
         public void ChartFalsePositiveRates(BloomFilterParameters parameters, Func<IBloomFilter> factory, Func<int, IEnumerable<string>> keyFactory, int numberToInsert, int sampleSize, int sampleInterval)
@@ -172,7 +188,7 @@ namespace Bloomn.Tests
 
                     var fpr = falsePositiveCount / (double) sampleSize;
                     incrementalFalsePositiveCounts[i] = falsePositiveCount;
-                    _testOutputHelper.WriteLine($"{i.ToString().PadLeft(magnitude, ' ')}: saturation:{sut.Saturation:F4} {fpr:F4} {new string('X', falsePositiveCount)}");
+                    TestOutputHelper.WriteLine($"{i.ToString().PadLeft(magnitude, ' ')}: saturation:{sut.Saturation:F4} {fpr:F4} {new string('X', falsePositiveCount)}");
                 }
             }
 
@@ -192,12 +208,12 @@ namespace Bloomn.Tests
 
             
             var averageIncrementalFpr = incrementalFalsePositiveCounts.Values.Select(x => x / (double) sampleSize).Average();
-            _testOutputHelper.WriteLine($"Average false positive rate while adding: {averageIncrementalFpr} (expected < {parameters.Dimensions.ErrorRate})");
+            TestOutputHelper.WriteLine($"Average false positive rate while adding: {averageIncrementalFpr} (expected < {parameters.Dimensions.ErrorRate})");
 
             var averageMaxedFpr = maxCapacityFalsePositiveCounts.Select(x => x / (double) sampleSize).Average();
-            _testOutputHelper.WriteLine($"Average false positive rate while at max capacity: {averageMaxedFpr} (expected < {parameters.Dimensions.ErrorRate})");
+            TestOutputHelper.WriteLine($"Average false positive rate while at max capacity: {averageMaxedFpr} (expected < {parameters.Dimensions.ErrorRate})");
             
-            averageIncrementalFpr.Should().BeLessThan(parameters.Dimensions.ErrorRate);
+            averageIncrementalFpr.Should().BeLessOrEqualTo(parameters.Dimensions.ErrorRate);
             var maxAcceptableErrorRate = parameters.Dimensions.ErrorRate + parameters.Dimensions.ErrorRate / 10;
             averageMaxedFpr.Should().BeLessThan(maxAcceptableErrorRate, $"the false positive rate should be close to or less than the max acceptable rate {parameters.Dimensions.ErrorRate}" );
             
@@ -246,7 +262,7 @@ namespace Bloomn.Tests
             var timer = Stopwatch.StartNew();
             var warmupResult = GetFalsePositiveCount();
             timer.Stop();
-            _testOutputHelper.WriteLine($"Warmup run completed in {timer.Elapsed.TotalMilliseconds}ms, with {warmupResult} false positives for an error rate of: {warmupResult / (double) sampleSize}");
+            TestOutputHelper.WriteLine($"Warmup run completed in {timer.Elapsed.TotalMilliseconds}ms, with {warmupResult} false positives for an error rate of: {warmupResult / (double) sampleSize}");
 
 
             for (int i = 0; i < reps; i++)
@@ -263,20 +279,20 @@ namespace Bloomn.Tests
             var falsePositiveStats = new DescriptiveStatistics(falsePositiveRates);
             var timeStats = new DescriptiveStatistics(times);
 
-            _testOutputHelper.WriteLine($"Expected error rate: {parameters.Dimensions.ErrorRate}");
-            _testOutputHelper.WriteLine($"Reps: {reps}");
-            _testOutputHelper.WriteLine($"Sample size: {sampleSize}");
-            _testOutputHelper.WriteLine($"Observed error rate stats:");
-            _testOutputHelper.WriteLine($"  Mean: {falsePositiveStats.Mean}");
-            _testOutputHelper.WriteLine($"  Min: {falsePositiveStats.Minimum}");
-            _testOutputHelper.WriteLine($"  Max: {falsePositiveStats.Maximum}");
-            _testOutputHelper.WriteLine($"  σ: {falsePositiveStats.StandardDeviation}");
+            TestOutputHelper.WriteLine($"Expected error rate: {parameters.Dimensions.ErrorRate}");
+            TestOutputHelper.WriteLine($"Reps: {reps}");
+            TestOutputHelper.WriteLine($"Sample size: {sampleSize}");
+            TestOutputHelper.WriteLine($"Observed error rate stats:");
+            TestOutputHelper.WriteLine($"  Mean: {falsePositiveStats.Mean}");
+            TestOutputHelper.WriteLine($"  Min: {falsePositiveStats.Minimum}");
+            TestOutputHelper.WriteLine($"  Max: {falsePositiveStats.Maximum}");
+            TestOutputHelper.WriteLine($"  σ: {falsePositiveStats.StandardDeviation}");
 
-            _testOutputHelper.WriteLine($"Duration stats:");
-            _testOutputHelper.WriteLine($"  Mean: {timeStats.Mean}ms");
-            _testOutputHelper.WriteLine($"  Min: {timeStats.Minimum}ms");
-            _testOutputHelper.WriteLine($"  Max: {timeStats.Maximum}ms");
-            _testOutputHelper.WriteLine($"  σ: {timeStats.StandardDeviation}ms");
+            TestOutputHelper.WriteLine($"Duration stats:");
+            TestOutputHelper.WriteLine($"  Mean: {timeStats.Mean}ms");
+            TestOutputHelper.WriteLine($"  Min: {timeStats.Minimum}ms");
+            TestOutputHelper.WriteLine($"  Max: {timeStats.Maximum}ms");
+            TestOutputHelper.WriteLine($"  σ: {timeStats.StandardDeviation}ms");
 
             if (reps == 1)
             {

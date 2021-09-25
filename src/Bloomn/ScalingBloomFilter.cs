@@ -12,9 +12,11 @@ namespace Bloomn
         private readonly ReaderWriterLockSlim _lock = new();
         private readonly BloomFilterOptions _options;
         private readonly BloomFilterParameters _parameters;
-        private readonly ScalingParameters _scalingParameters;
+        private readonly BloomFilterScaling _bloomFilterScaling;
         private readonly StateMetrics _metrics;
         private ClassicBloomFilter _activeFilter;
+
+        public BloomFilterParameters Parameters => _parameters;
 
         public ScalingBloomFilter(BloomFilterParameters parameters) : this(BloomFilterOptions.DefaultOptions, new BloomFilterState {Parameters = parameters})
         {
@@ -37,14 +39,14 @@ namespace Bloomn
 
             state.Parameters.Validate();
 
-            if (state.Parameters.ScalingParameters.MaxCapacityBehavior != MaxCapacityBehavior.Scale)
+            if (state.Parameters.Scaling.MaxCapacityBehavior != MaxCapacityBehavior.Scale)
             {
                 throw new ArgumentException(nameof(state), $"Parameters.ScalingParameters.MaxCapacityBehavior was not set to {MaxCapacityBehavior.Scale}");
             }
 
             _options = options;
             _parameters = state.Parameters;
-            _scalingParameters = state.Parameters.ScalingParameters;
+            _bloomFilterScaling = state.Parameters.Scaling;
 
             _metrics = new StateMetrics(_parameters, options.Callbacks);
 
@@ -53,7 +55,7 @@ namespace Bloomn
                 throw new ArgumentException("state.Parameters.Id must not be null", nameof(state));
             }
 
-            if (_scalingParameters.MaxCapacityBehavior == MaxCapacityBehavior.Scale)
+            if (_bloomFilterScaling.MaxCapacityBehavior == MaxCapacityBehavior.Scale)
             {
                 if (state.Children?.Count > 0)
                 {
@@ -94,7 +96,7 @@ namespace Bloomn
 
         public IBloomFilterDimensions Dimensions => _metrics;
 
-        public double Saturation => _filters.Sum(x => x.Saturation);
+        public double Saturation => _filters.Sum(x => x.Saturation) / _filters.Count;
 
         public BloomFilterEntry Check(BloomFilterCheckRequest checkRequest)
         {
@@ -106,7 +108,7 @@ namespace Bloomn
                     var preparedAdd = PrepareAdd(checkRequest);
                     if (preparedAdd.CanAdd)
                     {
-                        return new BloomFilterEntry(true, preparedAdd);
+                        return BloomFilterEntry.Addable(preparedAdd);
                     }
 
                     return BloomFilterEntry.MaybePresent;
@@ -142,11 +144,26 @@ namespace Bloomn
                 }
                 else
                 {
+                    // This handles the (rare) case where we rolled over to a new filter
+                    // while there was an outstanding prepared add on another thread. 
+                    // We will force this into the filter it belongs to because we have 
+                    // no way to recompute the key for the new filter, and it won't
+                    // disturb the contracts too much to exceed the capacity by a 
+                    // small number of entries.
                     foreach (var filter in _filters)
                     {
                         if (filter.Id == preparedAdd.FilterId)
                         {
-                            added = filter.ApplyPreparedAdd(preparedAdd);
+                            var previousBehavior = filter.MaxCapacityBehavior;
+                            try
+                            {
+                                filter.MaxCapacityBehavior = MaxCapacityBehavior.Ignore;
+                                added = filter.ApplyPreparedAdd(preparedAdd);
+                            }
+                            finally
+                            {
+                                filter.MaxCapacityBehavior = previousBehavior;
+                            }
                         }
                     }
                 }
@@ -156,7 +173,7 @@ namespace Bloomn
                     _metrics.IncrementCount(1);
                 }
 
-                if (_metrics.Count >= _metrics.Capacity)
+                if (_activeFilter.Count >= _activeFilter.Dimensions.Capacity)
                 {
                     Scale();
                 }
@@ -264,7 +281,6 @@ namespace Bloomn
             {
                 var state = new BloomFilterState
                 {
-                    Id = _parameters.Id,
                     Parameters = _parameters,
                     Count = Count
                 };
@@ -285,11 +301,11 @@ namespace Bloomn
             if (_activeFilter == null)
             {
                 var bloomFilterDimensions = _parameters.Dimensions;
-                if (_parameters.ScalingParameters.MaxCapacityBehavior == MaxCapacityBehavior.Scale)
+                if (_parameters.Scaling.MaxCapacityBehavior == MaxCapacityBehavior.Scale)
                 {
                     // We need to create the filter with a lower error rate so that the compounded 
                     // error rate for all filters will stay below the requested rate.
-                    var rescaledErrorRate = _parameters.Dimensions.ErrorRate / (1 / (1 - _parameters.ScalingParameters.ErrorRateScaling));
+                    var rescaledErrorRate = _parameters.Dimensions.ErrorRate / (1 / (1 - _parameters.Scaling.FalsePositiveProbabilityScaling));
                     bloomFilterDimensions = new BloomFilterDimensions.Computer()
                     {
                         Capacity = bloomFilterDimensions.Capacity,
@@ -310,9 +326,9 @@ namespace Bloomn
             }
             else
             {
-                var nextBitCount = (int) Math.Round(_activeFilter.Parameters.Dimensions.BitCount * _scalingParameters.CapacityScaling);
-                var nextErrorRate = _activeFilter.Parameters.Dimensions.ErrorRate * _scalingParameters.ErrorRateScaling;
-                var nextHashCount = (int) Math.Ceiling(_activeFilter.Parameters.Dimensions.HashCount + _filters.Count * Math.Log2(Math.Pow(_activeFilter.Parameters.ScalingParameters.ErrorRateScaling, -1)));
+                var nextBitCount = (int) Math.Round(_activeFilter.Parameters.Dimensions.BitCount * _bloomFilterScaling.CapacityScaling);
+                var nextErrorRate = _activeFilter.Parameters.Dimensions.ErrorRate * _bloomFilterScaling.FalsePositiveProbabilityScaling;
+                var nextHashCount = (int) Math.Ceiling(_activeFilter.Parameters.Dimensions.HashCount + _filters.Count * Math.Log2(Math.Pow(_activeFilter.Parameters.Scaling.FalsePositiveProbabilityScaling, -1)));
 
                 var nextDimensions = new BloomFilterDimensions.Computer()
                 {

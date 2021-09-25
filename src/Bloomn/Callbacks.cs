@@ -46,7 +46,7 @@ namespace Bloomn
             _callbacks.OnCapacityChanged?.Invoke(Id, value);
         }
 
-        public void IncrementCount(int amount) 
+        public void IncrementCount(long amount) 
         {
             var value = Interlocked.Add(ref _count, amount);
             _callbacks.OnCountChanged?.Invoke(Id, value);

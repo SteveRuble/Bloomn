@@ -157,22 +157,22 @@ namespace Bloomn
         {
             if (Capacity <= 0)
             {
-                throw new ValidationException("Capacity must be greater than 0.");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, "Capacity must be greater than 0.");
             }
 
             if (ErrorRate is <= 0 or >= 1)
             {
-                throw new ValidationException("ErrorRate must be between 0 and 1 exclusive.");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, "ErrorRate must be between 0 and 1 exclusive.");
             }
 
             if (BitCount <= 0)
             {
-                throw new ValidationException("BitCount must be greater than 0.");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, "BitCount must be greater than 0.");
             }
 
             if (HashCount is <= 2 or > 100)
             {
-                throw new ValidationException("HashCount must be greater than 1 and less than 100.");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, "HashCount must be greater than 1 and less than 100.");
             }
         }
 
@@ -200,14 +200,6 @@ namespace Bloomn
             }
 
             return diff;
-        }
-
-        public void Deconstruct(out double errorRate, out int capacity , out int bitCount , out int hashCount)
-        {
-            errorRate = this.ErrorRate;
-            capacity = this.Capacity;
-            bitCount = this.BitCount;
-            hashCount = this.HashCount;
         }
     }
 }

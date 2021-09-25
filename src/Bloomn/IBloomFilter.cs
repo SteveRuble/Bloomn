@@ -6,6 +6,8 @@ namespace Bloomn
         string Id { get; }
         long Count { get; }
         
+        BloomFilterParameters Parameters { get; }
+        
         IBloomFilterDimensions Dimensions { get; }
         
         double Saturation { get; }

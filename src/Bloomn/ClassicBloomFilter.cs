@@ -22,9 +22,10 @@ namespace Bloomn
         private readonly IKeyHasherFactory _keyHasherFactory;
         private readonly BitArray[] _bitArrays;
 
-        public readonly BloomFilterParameters Parameters;
         private readonly int _bitsPerSlice;
         private readonly int _actualBitCount;
+        
+        internal MaxCapacityBehavior MaxCapacityBehavior;
 
         public ClassicBloomFilter(BloomFilterOptions options, BloomFilterState state)
         {
@@ -52,6 +53,10 @@ namespace Bloomn
                 _bitArrays = Enumerable.Range(0, Parameters.Dimensions.HashCount).Select(_ => new BitArray(_bitsPerSlice)).ToArray();
             }
 
+            _metrics.IncrementSetBitCount(_bitArrays.Sum(x => x.OfType<bool>().Count(x => x)));
+            _metrics.IncrementCount(state.Count);
+            
+            MaxCapacityBehavior = Parameters.Scaling.MaxCapacityBehavior;
             _bitCount = Parameters.Dimensions.BitCount;
             _hashCount = Parameters.Dimensions.HashCount;
             _actualBitCount = _bitsPerSlice * _hashCount;
@@ -90,6 +95,7 @@ namespace Bloomn
         public double Saturation => _metrics.SetBitCount / (double) _actualBitCount;
 
         public long Count => _metrics.Count;
+        public BloomFilterParameters Parameters { get; }
 
         public BloomFilterEntry Check(BloomFilterCheckRequest checkRequest)
         {
@@ -102,7 +108,7 @@ namespace Bloomn
                     var preparedAdd = PrepareAdd(checkRequest);
                     if (preparedAdd.CanAdd)
                     {
-                        return new BloomFilterEntry(true, preparedAdd);
+                        return BloomFilterEntry.Addable(preparedAdd);
                     }
 
                     return BloomFilterEntry.MaybePresent;
@@ -111,7 +117,7 @@ namespace Bloomn
                     var wasNotPresent = TryAdd(checkRequest.Key);
                     if (wasNotPresent)
                     {
-                        return new BloomFilterEntry(wasNotPresent, PreparedAdd.AlreadyAdded);
+                        return BloomFilterEntry.Addable(PreparedAdd.AlreadyAdded);
                     }
 
                     return BloomFilterEntry.MaybePresent;
@@ -220,6 +226,7 @@ namespace Bloomn
             _lock.EnterWriteLock();
             try
             {
+                ValidateCapacity();
                 var wasPresent = true;
                 var bytes = key.Bytes;
 
@@ -259,6 +266,7 @@ namespace Bloomn
             _lock.EnterWriteLock();
             try
             {
+                ValidateCapacity();
                 var madeChange = false;
                 if (preparedAdd.Indexes != null)
                 {
@@ -312,11 +320,27 @@ namespace Bloomn
             return (int) (Math.Abs(hash) % _bitsPerSlice);
         }
 
+        private void ValidateCapacity()
+        {
+            switch (MaxCapacityBehavior)
+            {
+                case MaxCapacityBehavior.Ignore:
+                    return;
+            }
+
+            if (_metrics.Count > _metrics.Capacity)
+            {
+                throw new BloomFilterException(BloomFilterExceptionCode.MaxCapacityExceeded,
+                    $"Cannot add to filter because filter is at maximum capacity {Parameters.Dimensions.Capacity}. " +
+                    $"Adding more entries would increase the false positive rate above the configured value. " +
+                    $"Perhaps you should enable scaling.");
+            }
+        }
+
         public BloomFilterState GetState()
         {
             var state = new BloomFilterState
             {
-                Id = Parameters.Id,
                 Parameters = Parameters,
                 Count = Count,
                 BitArrays = _bitArrays.Select(x =>

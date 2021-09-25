@@ -9,8 +9,6 @@ namespace Bloomn
 {
     public class BloomFilterState
     {
-        public string? Id { get; set; }
-
         public string ApiVersion { get; set; } = "v1";
 
         public BloomFilterParameters? Parameters { get; set; }
@@ -23,15 +21,31 @@ namespace Bloomn
 
         public string Serialize()
         {
-            return System.Text.Json.JsonSerializer.Serialize(this, typeof(BloomFilterState), JsonSerializerOptions);
+            try
+            {
+                return System.Text.Json.JsonSerializer.Serialize(this, typeof(BloomFilterState), JsonSerializerOptions);
+            }
+            catch (Exception ex)
+            {
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidSerializedState, "Could not serialize state.", ex);
+            }
         }
 
         public static BloomFilterState Deserialize(string serialized)
         {
-            var state = System.Text.Json.JsonSerializer.Deserialize<BloomFilterState>(serialized, JsonSerializerOptions);
+            BloomFilterState? state;
+            try
+            {
+                state = System.Text.Json.JsonSerializer.Deserialize<BloomFilterState>(serialized, JsonSerializerOptions);
+            }
+            catch (Exception ex)
+            {
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidSerializedState, "Could not deserialize state.", ex);
+            }
+
             if (state == null)
             {
-                throw new SerializationException("Deserialization returned null.");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidSerializedState, "Deserialization returned null.");
             }
 
             return state;
@@ -39,7 +53,8 @@ namespace Bloomn
 
         private static readonly JsonSerializerOptions JsonSerializerOptions = new JsonSerializerOptions()
         {
-            Converters = { new StateJsonSerializer() }
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = {new StateJsonSerializer()}
         };
 
         private class StateJsonSerializer : System.Text.Json.Serialization.JsonConverter<BloomFilterState>
@@ -47,15 +62,14 @@ namespace Bloomn
             public override BloomFilterState Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
                 var result = new BloomFilterState();
+                reader.Read();
 
-                while (reader.Read())
+                for (; reader.TokenType != JsonTokenType.EndObject; reader.Read())
                 {
                     var propertyName = reader.GetString();
+                    reader.Read();
                     switch (propertyName)
                     {
-                        case "id": 
-                            result.Id = reader.GetString();
-                            break;
                         case "count":
                             result.Count = reader.GetInt64();
                             break;
@@ -65,11 +79,12 @@ namespace Bloomn
                         case "bits":
                             reader.Read();
                             result.BitArrays = new List<byte[]>();
-                            while (reader.TokenType != JsonTokenType.EndArray)
+                            for (; reader.TokenType != JsonTokenType.EndArray; reader.Read())
                             {
                                 var bits = reader.GetBytesFromBase64();
                                 result.BitArrays.Add(bits);
                             }
+
                             break;
                         case "children":
                             result.Children = JsonSerializer.Deserialize<List<BloomFilterState>>(ref reader, options);
@@ -83,13 +98,12 @@ namespace Bloomn
             public override void Write(Utf8JsonWriter writer, BloomFilterState value, JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
-                writer.WriteString("id", value.Id);
                 writer.WriteString("apiVersion", value.ApiVersion);
                 writer.WriteNumber("count", value.Count);
                 writer.WritePropertyName("parameters");
-                var parameters = value.Parameters ?? new BloomFilterParameters(value.Id ?? "unknown");
+                var parameters = value.Parameters ?? new BloomFilterParameters("unknown");
 
-                JsonSerializer.Serialize(writer, parameters);
+                JsonSerializer.Serialize(writer, parameters, options);
 
                 if (value.BitArrays != null && value.BitArrays.Any())
                 {

@@ -53,5 +53,43 @@ namespace Bloomn.Tests
                 ).WhenTypeIs<double>());
             
         }
+
+        [Fact]
+        public void CanValidate()
+        {
+            this.Invoking(_ => new BloomFilterDimensions()
+            {
+                Capacity = 1000,
+                BitCount = 1000,
+                ErrorRate = 0.03,
+                HashCount = 0
+            }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
+            
+            this.Invoking(_ => new BloomFilterDimensions()
+            {
+                Capacity = 0,
+                BitCount = 1000,
+                ErrorRate = 0.03,
+                HashCount = 5
+            }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
+       
+            this.Invoking(_ => new BloomFilterDimensions()
+            {
+                Capacity = 1000,
+                BitCount = 0,
+                ErrorRate = 0.03,
+                HashCount = 5
+            }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
+         
+            this.Invoking(_ => new BloomFilterDimensions()
+            {
+                Capacity = 1000,
+                BitCount = 123,
+                ErrorRate = 0,
+                HashCount = 5
+            }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
+
+            
+        }
     }
 }
