@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bloomn", "src\Bloomn\Bloomn.csproj", "{7C864204-2CFC-4200-BCCF-0027A89C6CF3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bloomn.Tests", "tests\Bloomn.Tests\Bloomn.Tests.csproj", "{171BBD20-CB99-41CD-9F23-EA7BF99241E4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7C864204-2CFC-4200-BCCF-0027A89C6CF3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C864204-2CFC-4200-BCCF-0027A89C6CF3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C864204-2CFC-4200-BCCF-0027A89C6CF3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C864204-2CFC-4200-BCCF-0027A89C6CF3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{171BBD20-CB99-41CD-9F23-EA7BF99241E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{171BBD20-CB99-41CD-9F23-EA7BF99241E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{171BBD20-CB99-41CD-9F23-EA7BF99241E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{171BBD20-CB99-41CD-9F23-EA7BF99241E4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
