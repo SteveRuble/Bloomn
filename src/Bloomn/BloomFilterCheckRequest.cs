@@ -22,16 +22,16 @@ namespace Bloomn
         AddImmediately
     }
     
-    public readonly ref struct BloomFilterCheckRequest
+    public readonly ref struct BloomFilterCheckRequest<T>
     {
-        public readonly BloomFilterKey Key;
+        public readonly T Key;
         public readonly BloomFilterCheckBehavior Behavior;
 
-        public static BloomFilterCheckRequest CheckOnly(BloomFilterKey key) => new BloomFilterCheckRequest(key, BloomFilterCheckBehavior.CheckOnly);
-        public static BloomFilterCheckRequest PrepareForAdd(BloomFilterKey key) => new BloomFilterCheckRequest(key, BloomFilterCheckBehavior.PrepareForAdd);
-        public static BloomFilterCheckRequest AddImmediately(BloomFilterKey key) => new BloomFilterCheckRequest(key, BloomFilterCheckBehavior.AddImmediately);
+        public static BloomFilterCheckRequest<T> CheckOnly(T key) => new BloomFilterCheckRequest<T>(key, BloomFilterCheckBehavior.CheckOnly);
+        public static BloomFilterCheckRequest<T> PrepareForAdd(T key) => new BloomFilterCheckRequest<T>(key, BloomFilterCheckBehavior.PrepareForAdd);
+        public static BloomFilterCheckRequest<T> AddImmediately(T key) => new BloomFilterCheckRequest<T>(key, BloomFilterCheckBehavior.AddImmediately);
         
-        public BloomFilterCheckRequest(BloomFilterKey key, BloomFilterCheckBehavior behavior)
+        public BloomFilterCheckRequest(T key, BloomFilterCheckBehavior behavior)
         {
             Key = key;
             Behavior = behavior;

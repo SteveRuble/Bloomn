@@ -16,7 +16,7 @@ namespace Bloomn.Tests
                 .Should().BeEquivalentTo(new BloomFilterDimensions()
                 {
                     Capacity = capacity,
-                    ErrorRate = errorRate,
+                    FalsePositiveProbability = errorRate,
                     BitCount = bitCount,
                     HashCount = hashCount,
                 }, o => o.ComparingByMembers<BloomFilterParameters>());   
@@ -38,13 +38,13 @@ namespace Bloomn.Tests
         
         )
         {
-            new BloomFilterDimensions.Computer()
+            new BloomFilterDimensionsBuilder()
             {
                 Capacity = capacity,
                 BitCount = bitCount,
                 HashCount = hashCount,
-                FalsePositiveRate = falsePositiveRate
-            }.Compute().Should().BeEquivalentTo(new BloomFilterDimensions(
+                FalsePositiveProbability = falsePositiveRate
+            }.Build().Should().BeEquivalentTo(new BloomFilterDimensions(
                 expectedFalsePositiveRate, 
                 expectedCapacity,
                 expectedBitCount,
@@ -61,7 +61,7 @@ namespace Bloomn.Tests
             {
                 Capacity = 1000,
                 BitCount = 1000,
-                ErrorRate = 0.03,
+                FalsePositiveProbability = 0.03,
                 HashCount = 0
             }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
             
@@ -69,7 +69,7 @@ namespace Bloomn.Tests
             {
                 Capacity = 0,
                 BitCount = 1000,
-                ErrorRate = 0.03,
+                FalsePositiveProbability = 0.03,
                 HashCount = 5
             }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
        
@@ -77,7 +77,7 @@ namespace Bloomn.Tests
             {
                 Capacity = 1000,
                 BitCount = 0,
-                ErrorRate = 0.03,
+                FalsePositiveProbability = 0.03,
                 HashCount = 5
             }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
          
@@ -85,7 +85,7 @@ namespace Bloomn.Tests
             {
                 Capacity = 1000,
                 BitCount = 123,
-                ErrorRate = 0,
+                FalsePositiveProbability = 0,
                 HashCount = 5
             }.Validate()).Should().Throw<BloomFilterException>().Which.Code.Should().Be(BloomFilterExceptionCode.InvalidParameters);
 

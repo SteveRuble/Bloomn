@@ -1,7 +1,7 @@
 namespace Bloomn
 {
    
-    public interface IBloomFilter
+    public interface IBloomFilter<T>
     {
         string Id { get; }
         long Count { get; }
@@ -18,7 +18,7 @@ namespace Bloomn
         /// </summary>
         /// <param name="checkRequest"></param>
         /// <returns></returns>
-        BloomFilterEntry Check(BloomFilterCheckRequest checkRequest);
+        BloomFilterEntry Check(BloomFilterCheckRequest<T> checkRequest);
 
         BloomFilterState GetState();
     }
@@ -30,18 +30,18 @@ namespace Bloomn
 
     public static class BloomFilterExtensions
     {
-        public static BloomFilterEntry CheckAndPrepareAdd(this IBloomFilter bloomFilter, BloomFilterKey key)
-            => bloomFilter.Check(BloomFilterCheckRequest.PrepareForAdd(key));
+        public static BloomFilterEntry CheckAndPrepareAdd<T>(this IBloomFilter<T> bloomFilter, T key)
+            => bloomFilter.Check(BloomFilterCheckRequest<T>.PrepareForAdd(key));
 
-        public static bool Add(this IBloomFilter bloomFilter, BloomFilterKey key)
+        public static bool Add<T>(this IBloomFilter<T> bloomFilter, T key)
         {
-            var check = bloomFilter.Check(BloomFilterCheckRequest.AddImmediately(key));
+            var check = bloomFilter.Check(BloomFilterCheckRequest<T>.AddImmediately(key));
             return check.IsNotPresent;
         }
         
-        public static bool IsNotPresent(this IBloomFilter bloomFilter, BloomFilterKey key)
+        public static bool IsNotPresent<T>(this IBloomFilter<T> bloomFilter, T key)
         {
-            var check = bloomFilter.Check(BloomFilterCheckRequest.CheckOnly(key));
+            var check = bloomFilter.Check(BloomFilterCheckRequest<T>.CheckOnly(key));
             return check.IsNotPresent;
         }
     }

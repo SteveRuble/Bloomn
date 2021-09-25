@@ -10,9 +10,9 @@ namespace Bloomn.Tests
         {
         }
 
-        public override IBloomFilter Create(BloomFilterOptions options, BloomFilterParameters parameters)
+        public override IBloomFilter<string> Create(BloomFilterOptions<string> options, BloomFilterParameters parameters)
         {
-            return new ClassicBloomFilter(options, new BloomFilterState()
+            return new ClassicBloomFilter<string>(options, new BloomFilterState()
             {
                 Parameters = parameters
             });
@@ -25,13 +25,13 @@ namespace Bloomn.Tests
             var parameters = new BloomFilterParameters("test")
                 .WithCapacityAndErrorRate(10000, 0.1);
 
-            var first = new ClassicBloomFilter(new BloomFilterOptions(), new BloomFilterState()
+            var first = new ClassicBloomFilter<string>(new BloomFilterOptions<string>(), new BloomFilterState()
             {
                 Parameters = parameters
             });
             
             // Populate with data
-            ChartFalsePositiveRates(parameters, () => first, RandomStrings, 1000, 100, 100);
+            ChartFalsePositiveRates(parameters, () => first, RandomStrings, 5000, 100, 100);
 
             var firstState = first.GetState();
 
@@ -39,7 +39,7 @@ namespace Bloomn.Tests
 
             var secondState = BloomFilterState.Deserialize(serializedFirstState);
 
-            var second = new ClassicBloomFilter(new BloomFilterOptions(), secondState);
+            var second = new ClassicBloomFilter<string>(new BloomFilterOptions<string>(), secondState);
             
             second.Parameters.Should().BeEquivalentTo(first.Parameters);
 
@@ -48,7 +48,7 @@ namespace Bloomn.Tests
             var fpr = GetFalsePositiveRate(second, 10000);
 
             fpr.Should().BeGreaterThan(0, "there should be some false positives");
-            fpr.Should().BeLessOrEqualTo(parameters.Dimensions.ErrorRate, "the filter should behave correctly");
+            fpr.Should().BeLessOrEqualTo(parameters.Dimensions.FalsePositiveProbability, "the filter should behave correctly");
         }    
     }
 }

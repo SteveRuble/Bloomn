@@ -6,10 +6,11 @@ namespace Bloomn
     public enum BloomFilterExceptionCode
     {
         Unknown = 0,
-        MaxCapacityExceeded = 1,
-        InvalidParameters = 2,
-        ParameterMismatch = 3,
-        InvalidSerializedState = 4,
+        MaxCapacityExceeded,
+        InvalidParameters ,
+        InvalidOptions,
+        ParameterMismatch,
+        InvalidSerializedState,
     }
     
     [Serializable]

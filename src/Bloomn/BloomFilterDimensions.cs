@@ -7,7 +7,7 @@ namespace Bloomn
 {
     public interface IBloomFilterDimensions
     {
-        double ErrorRate { get; }
+        double FalsePositiveProbability { get; }
         int Capacity { get; }
         int BitCount { get; }
         int HashCount { get; }
@@ -15,87 +15,6 @@ namespace Bloomn
 
     public record BloomFilterDimensions : IBloomFilterDimensions
     {
-        public class Computer
-        {
-            public double? FalsePositiveRate { get; set; }
-            public int? Capacity { get; set; }
-            public int? BitCount { get; set; }
-            public int? HashCount { get; set; }
-
-            [MemberNotNullWhen(true, nameof(FalsePositiveRate))]
-            [MemberNotNullWhen(true, nameof(Capacity))]
-            [MemberNotNullWhen(true, nameof(BitCount))]
-            [MemberNotNullWhen(true, nameof(HashCount))]
-            public bool FullySpecified => FalsePositiveRate != null && Capacity != null && BitCount != null && HashCount != null;
-
-            public bool Computable =>
-                (Capacity.HasValue && FalsePositiveRate.HasValue)
-                || (FalsePositiveRate.HasValue && BitCount.HasValue)
-                || (Capacity.HasValue && FalsePositiveRate.HasValue)
-                || (Capacity.HasValue && BitCount.HasValue)
-                || (FalsePositiveRate.HasValue && BitCount.HasValue);
-
-            public BloomFilterDimensions Compute()
-            {
-                if (!Computable)
-                {
-                    throw new InvalidOperationException("Not enough parameters are set.");
-                }
-
-                var makingProgress = true;
-                while (!FullySpecified && makingProgress)
-                {
-                    makingProgress = false;
-                    if (!HashCount.HasValue && Capacity.HasValue && BitCount.HasValue)
-                    {
-                        HashCount = Equations.k(BitCount.Value, Capacity.Value);
-                        makingProgress = true;
-                        continue;
-                    }  
-                    
-                    if (!HashCount.HasValue && FalsePositiveRate.HasValue)
-                    {
-                        HashCount = Equations.k(FalsePositiveRate.Value);
-                        makingProgress = true;
-                        continue;
-                    }
-
-                    if (!BitCount.HasValue && Capacity.HasValue && FalsePositiveRate.HasValue)
-                    {
-                        BitCount = Equations.m(Capacity.Value, FalsePositiveRate.Value);
-                        makingProgress = true;
-                        continue;
-                    }
-
-                    if (!Capacity.HasValue && BitCount.HasValue && HashCount.HasValue && FalsePositiveRate.HasValue)
-                    {
-                        Capacity = Equations.n(BitCount.Value, HashCount.Value, FalsePositiveRate.Value);
-                        makingProgress = true;
-                        continue;
-                    }
-
-                    if (!FalsePositiveRate.HasValue && BitCount.HasValue && Capacity.HasValue && HashCount.HasValue)
-                    {
-                        FalsePositiveRate = Equations.p(BitCount.Value, Capacity.Value, HashCount.Value);
-                        makingProgress = true;
-                        continue;
-                    }
-                }
-
-                if (!FullySpecified)
-                {
-                    throw new InvalidOperationException($"Could not compute dimensions using provided values: {this}");
-                }
-
-                return new BloomFilterDimensions(FalsePositiveRate.Value, Capacity.Value, BitCount.Value, HashCount.Value);
-            }
-
-            public override string ToString()
-            {
-                return $"{nameof(FalsePositiveRate)}: {FalsePositiveRate}, {nameof(Capacity)}: {Capacity}, {nameof(BitCount)}: {BitCount}, {nameof(HashCount)}: {HashCount}";
-            }
-        }
-
         /// <summary>
         /// These are the equations which relate the bloom filter parameters.
         /// n => max items before invariants are broken
@@ -126,19 +45,19 @@ namespace Bloomn
             // ReSharper restore InconsistentNaming
         }
 
-        public double ErrorRate { get; init; }
+        public double FalsePositiveProbability { get; init; }
         public int Capacity { get; init; }
         public int BitCount { get; init; }
         public int HashCount { get; init; }
         
-        public BloomFilterDimensions(double errorRate = 0.01, int capacity = 10000, int bitCount = 95851, int hashCount = 7)
+        public BloomFilterDimensions(double falsePositiveProbability = 0.01, int capacity = 10000, int bitCount = 95851, int hashCount = 7)
         {
             if (hashCount < 2)
             {
-                throw new ArgumentOutOfRangeException(nameof(errorRate), errorRate, "Parameters resulted in a hash count of 1, which is pointless.");
+                throw new ArgumentOutOfRangeException(nameof(falsePositiveProbability), falsePositiveProbability, "Parameters resulted in a hash count of 1, which is pointless.");
             }
 
-            ErrorRate = errorRate;
+            FalsePositiveProbability = falsePositiveProbability;
             Capacity = capacity;
             BitCount = bitCount;
             HashCount = hashCount;
@@ -146,11 +65,11 @@ namespace Bloomn
 
         public static BloomFilterDimensions ForCapacityAndErrorRate(int capacity, double errorRate)
         {
-            return new Computer()
+            return new BloomFilterDimensionsBuilder()
             {
                 Capacity = capacity, 
-                FalsePositiveRate = errorRate
-            }.Compute();
+                FalsePositiveProbability = errorRate
+            }.Build();
         }
 
         public void Validate()
@@ -160,7 +79,7 @@ namespace Bloomn
                 throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, "Capacity must be greater than 0.");
             }
 
-            if (ErrorRate is <= 0 or >= 1)
+            if (FalsePositiveProbability is <= 0 or >= 1)
             {
                 throw new BloomFilterException(BloomFilterExceptionCode.InvalidParameters, "ErrorRate must be between 0 and 1 exclusive.");
             }
@@ -194,12 +113,93 @@ namespace Bloomn
                 diff.Add($"{nameof(HashCount)}: {HashCount} != {other.HashCount}");
             }
 
-            if (Math.Abs(ErrorRate - other.ErrorRate) > double.Epsilon)
+            if (Math.Abs(FalsePositiveProbability - other.FalsePositiveProbability) > double.Epsilon)
             {
-                diff.Add($"{nameof(ErrorRate)}: {ErrorRate} != {other.ErrorRate}");
+                diff.Add($"{nameof(FalsePositiveProbability)}: {FalsePositiveProbability} != {other.FalsePositiveProbability}");
             }
 
             return diff;
+        }
+    }
+
+    public class BloomFilterDimensionsBuilder
+    {
+        public double? FalsePositiveProbability { get; set; }
+        public int? Capacity { get; set; }
+        public int? BitCount { get; set; }
+        public int? HashCount { get; set; }
+
+        [MemberNotNullWhen(true, nameof(FalsePositiveProbability))]
+        [MemberNotNullWhen(true, nameof(Capacity))]
+        [MemberNotNullWhen(true, nameof(BitCount))]
+        [MemberNotNullWhen(true, nameof(HashCount))]
+        public bool FullySpecified => FalsePositiveProbability != null && Capacity != null && BitCount != null && HashCount != null;
+
+        public bool Buildable =>
+            (Capacity.HasValue && FalsePositiveProbability.HasValue)
+            || (FalsePositiveProbability.HasValue && BitCount.HasValue)
+            || (Capacity.HasValue && FalsePositiveProbability.HasValue)
+            || (Capacity.HasValue && BitCount.HasValue)
+            || (FalsePositiveProbability.HasValue && BitCount.HasValue);
+
+        public BloomFilterDimensions Build()
+        {
+            if (!Buildable)
+            {
+                throw new InvalidOperationException("Not enough parameters are set.");
+            }
+
+            var makingProgress = true;
+            while (!FullySpecified && makingProgress)
+            {
+                makingProgress = false;
+                if (!HashCount.HasValue && Capacity.HasValue && BitCount.HasValue)
+                {
+                    HashCount = BloomFilterDimensions.Equations.k(BitCount.Value, Capacity.Value);
+                    makingProgress = true;
+                    continue;
+                }  
+                    
+                if (!HashCount.HasValue && FalsePositiveProbability.HasValue)
+                {
+                    HashCount = BloomFilterDimensions.Equations.k(FalsePositiveProbability.Value);
+                    makingProgress = true;
+                    continue;
+                }
+
+                if (!BitCount.HasValue && Capacity.HasValue && FalsePositiveProbability.HasValue)
+                {
+                    BitCount = BloomFilterDimensions.Equations.m(Capacity.Value, FalsePositiveProbability.Value);
+                    makingProgress = true;
+                    continue;
+                }
+
+                if (!Capacity.HasValue && BitCount.HasValue && HashCount.HasValue && FalsePositiveProbability.HasValue)
+                {
+                    Capacity = BloomFilterDimensions.Equations.n(BitCount.Value, HashCount.Value, FalsePositiveProbability.Value);
+                    makingProgress = true;
+                    continue;
+                }
+
+                if (!FalsePositiveProbability.HasValue && BitCount.HasValue && Capacity.HasValue && HashCount.HasValue)
+                {
+                    FalsePositiveProbability = BloomFilterDimensions.Equations.p(BitCount.Value, Capacity.Value, HashCount.Value);
+                    makingProgress = true;
+                    continue;
+                }
+            }
+
+            if (!FullySpecified)
+            {
+                throw new InvalidOperationException($"Could not compute dimensions using provided values: {this}");
+            }
+
+            return new BloomFilterDimensions(FalsePositiveProbability.Value, Capacity.Value, BitCount.Value, HashCount.Value);
+        }
+
+        public override string ToString()
+        {
+            return $"{nameof(FalsePositiveProbability)}: {FalsePositiveProbability}, {nameof(Capacity)}: {Capacity}, {nameof(BitCount)}: {BitCount}, {nameof(HashCount)}: {HashCount}";
         }
     }
 }

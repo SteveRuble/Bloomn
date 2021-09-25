@@ -13,11 +13,11 @@ namespace Bloomn.Tests
         {
         }
 
-        public override IBloomFilter Create(BloomFilterOptions options, BloomFilterParameters parameters)
+        public override IBloomFilter<string> Create(BloomFilterOptions<string> options, BloomFilterParameters parameters)
         {
             parameters = parameters.WithScaling(2, 0.8);
             
-            return new ScalingBloomFilter(options, new BloomFilterState()
+            return new ScalingBloomFilter<string>(options, new BloomFilterState()
             {
                 Parameters = parameters
             });
@@ -94,7 +94,7 @@ namespace Bloomn.Tests
                 .WithCapacityAndErrorRate(100, 0.1)
                 .WithScaling();
 
-            var first = new ScalingBloomFilter(new BloomFilterOptions()
+            var first = new ScalingBloomFilter<string>(new BloomFilterOptions<string>()
             {
                 Callbacks = new Callbacks()
                 {
@@ -111,7 +111,7 @@ namespace Bloomn.Tests
 
             var secondState = BloomFilterState.Deserialize(serializedFirstState);
 
-            var second = new ScalingBloomFilter(secondState);
+            var second = new ScalingBloomFilter<string>(secondState);
             
             second.Parameters.Should().BeEquivalentTo(first.Parameters);
 
@@ -120,7 +120,7 @@ namespace Bloomn.Tests
             var fpr = GetFalsePositiveRate(second, 10000);
 
             fpr.Should().BeGreaterThan(0, "there should be some false positives");
-            fpr.Should().BeLessOrEqualTo(parameters.Dimensions.ErrorRate, "the filter should behave correctly");
+            fpr.Should().BeLessOrEqualTo(parameters.Dimensions.FalsePositiveProbability, "the filter should behave correctly");
         }    
     }
 }

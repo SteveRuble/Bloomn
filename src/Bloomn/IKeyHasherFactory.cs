@@ -2,9 +2,9 @@ using System;
 
 namespace Bloomn
 {
-    public interface IKeyHasherFactory
+    public interface IKeyHasherFactory<T>
     {
         string Algorithm { get; }
-        uint Hash(ReadOnlySpan<Byte> key, int seed);
+        Func<T, uint> CreateHasher(int seed, int modulus);
     }
 }

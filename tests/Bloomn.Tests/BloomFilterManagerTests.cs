@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using Bloomn.Extensions;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,14 +16,14 @@ namespace Bloomn.Tests
     
     public class BloomFilterBuilderTests
     {
-        public BloomFilterOptions DefaultOptions { get; set; }
-        public Mock<IOptionsMonitor<BloomFilterOptions>> OptionsMonitor { get; set; }
+        public BloomFilterOptions<string> DefaultOptions { get; set; }
+        public Mock<IOptionsMonitor<BloomFilterOptions<string>>> OptionsMonitor { get; set; }
         
         public BloomFilterBuilderTests()
         {
-            DefaultOptions = new BloomFilterOptions();
+            DefaultOptions = new BloomFilterOptions<string>();
 
-            OptionsMonitor = new Mock<IOptionsMonitor<BloomFilterOptions>>();
+            OptionsMonitor = new Mock<IOptionsMonitor<BloomFilterOptions<string>>>();
             OptionsMonitor.SetupGet(x => x.CurrentValue).Returns(DefaultOptions);
         }
 
@@ -30,9 +31,9 @@ namespace Bloomn.Tests
         public void BuilderCanCreateDefaultInstance()
         {
             var sut = new ServiceCollection()
-                .AddBloomFilters()
+                .AddBloomFilters<string>()
                 .BuildServiceProvider()
-                .GetRequiredService<IBloomFilterBuilder>();
+                .GetRequiredService<IBloomFilterBuilder<string>>();
             
             var actual = sut.Build();
             actual.Dimensions.Should().BeEquivalentTo(new BloomFilterDimensions());

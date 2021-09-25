@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Bloomn
 {
-    public class ClassicBloomFilter : IBloomFilter
+    public class ClassicBloomFilter<T> : IBloomFilter<T>
     {
         /// <summary>
         ///     Seed used for second hash.
@@ -19,7 +19,8 @@ namespace Bloomn
         private readonly int _hashCount;
         private readonly StateMetrics _metrics;
         private readonly ArrayPool<int> _indexPool;
-        private readonly IKeyHasherFactory _keyHasherFactory;
+        private readonly Func<T, uint> _hasher1;
+        private readonly Func<T, uint> _hasher2;
         private readonly BitArray[] _bitArrays;
 
         private readonly int _bitsPerSlice;
@@ -27,7 +28,7 @@ namespace Bloomn
         
         internal MaxCapacityBehavior MaxCapacityBehavior;
 
-        public ClassicBloomFilter(BloomFilterOptions options, BloomFilterState state)
+        public ClassicBloomFilter(BloomFilterOptions<T> options, BloomFilterState state)
         {
             if (state.Parameters == null)
             {
@@ -38,7 +39,7 @@ namespace Bloomn
 
             Parameters = state.Parameters;
 
-            _keyHasherFactory = options.GetHasher();
+            var hasherFactory = options.GetHasher();
 
             _metrics = new StateMetrics(Parameters, options.Callbacks);
 
@@ -56,11 +57,15 @@ namespace Bloomn
             _metrics.IncrementSetBitCount(_bitArrays.Sum(x => x.OfType<bool>().Count(x => x)));
             _metrics.IncrementCount(state.Count);
             
+            
             MaxCapacityBehavior = Parameters.Scaling.MaxCapacityBehavior;
             _bitCount = Parameters.Dimensions.BitCount;
             _hashCount = Parameters.Dimensions.HashCount;
             _actualBitCount = _bitsPerSlice * _hashCount;
             _indexPool = ArrayPool<int>.Create(_hashCount, 10);
+
+            _hasher1 = hasherFactory.CreateHasher(0, _bitsPerSlice);
+            _hasher2 = hasherFactory.CreateHasher(Hash2Seed, _bitsPerSlice);
         }
 
         internal static int ComputeBitsPerSlice(int bitCount, int hashCount)
@@ -97,7 +102,7 @@ namespace Bloomn
         public long Count => _metrics.Count;
         public BloomFilterParameters Parameters { get; }
 
-        public BloomFilterEntry Check(BloomFilterCheckRequest checkRequest)
+        public BloomFilterEntry Check(BloomFilterCheckRequest<T> checkRequest)
         {
             switch (checkRequest.Behavior)
             {
@@ -127,15 +132,15 @@ namespace Bloomn
             }
         }
 
-        public bool IsNotPresent(BloomFilterCheckRequest checkRequest)
+        public bool IsNotPresent(BloomFilterCheckRequest<T> checkRequest)
         {
             _lock.EnterReadLock();
             try
             {
                 var maybePresent = true;
-                var bytes = checkRequest.Key.Bytes;
+                var key = checkRequest.Key;
 
-                var hash1 = _keyHasherFactory.Hash(bytes, 0);
+                var hash1 = _hasher1(key);
                 var index = AdaptHash(hash1);
                 maybePresent = GetBit(0, index);
                 if (!maybePresent)
@@ -143,7 +148,7 @@ namespace Bloomn
                     return true;
                 }
 
-                var hash2 = _keyHasherFactory.Hash(bytes, Hash2Seed);
+                var hash2 = _hasher2(key);
                 index = AdaptHash(hash2);
                 maybePresent = GetBit(1, index);
 
@@ -171,7 +176,7 @@ namespace Bloomn
             }
         }
 
-        private PreparedAdd PrepareAdd(BloomFilterCheckRequest checkRequest)
+        private PreparedAdd PrepareAdd(BloomFilterCheckRequest<T> checkRequest)
         {
             _lock.EnterReadLock();
             try
@@ -179,15 +184,15 @@ namespace Bloomn
                 var indexes = _indexPool.Rent(_hashCount);
 
                 var maybePresent = true;
-                var bytes = checkRequest.Key.Bytes;
+                var key = checkRequest.Key;
 
-                var hash1 = _keyHasherFactory.Hash(bytes, 0);
-                var index = AdaptHash(hash1);
+                var hash1 = (int)_hasher1(key);
+                var index = hash1;
                 maybePresent &= GetBit(0, index);
                 indexes[0] = index;
 
-                var hash2 = _keyHasherFactory.Hash(bytes, Hash2Seed);
-                index = AdaptHash(hash2);
+                var hash2 = (int)_hasher2(key);
+                index = hash2;
                 if (maybePresent)
                 {
                     maybePresent &= GetBit(1, index);
@@ -221,20 +226,19 @@ namespace Bloomn
             }
         }
 
-        private bool TryAdd(BloomFilterKey key)
+        private bool TryAdd(T key)
         {
             _lock.EnterWriteLock();
             try
             {
                 ValidateCapacity();
                 var wasPresent = true;
-                var bytes = key.Bytes;
 
-                var hash1 = _keyHasherFactory.Hash(bytes, 0);
+                var hash1 = _hasher1(key);
                 var index = AdaptHash(hash1);
                 wasPresent &= SetBitAndReturnPreviousState(0, index);
 
-                var hash2 = _keyHasherFactory.Hash(bytes, Hash2Seed);
+                var hash2 = _hasher2(key);
                 index = AdaptHash(hash2);
                 wasPresent &= SetBitAndReturnPreviousState(1, index);
 

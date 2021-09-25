@@ -37,7 +37,7 @@ namespace Bloomn.Tests
         {
         }
 
-        public BloomFilterOptions Options { get; set; }
+        public BloomFilterOptions<string> Options { get; set; }
 
         private const bool AddLoggingCallbacks = false;
 
@@ -46,7 +46,7 @@ namespace Bloomn.Tests
             TestOutputHelper = testOutputHelper;
 
 
-            Options = new BloomFilterOptions()
+            Options = new BloomFilterOptions<string>()
             {
                 Callbacks = AddLoggingCallbacks
                     ? new Callbacks
@@ -67,7 +67,7 @@ namespace Bloomn.Tests
             };
         }
 
-        public abstract IBloomFilter Create(BloomFilterOptions options, BloomFilterParameters parameters);
+        public abstract IBloomFilter<string> Create(BloomFilterOptions<string> options, BloomFilterParameters parameters);
 
         [Fact]
         public void CanAddAndCheckSingleItem()
@@ -142,7 +142,7 @@ namespace Bloomn.Tests
             );
         }
 
-        public double GetFalsePositiveRate(IBloomFilter bloomFilter, int sampleSize)
+        public double GetFalsePositiveRate(IBloomFilter<string> bloomFilter, int sampleSize)
         {
             var keys = RandomStrings(sampleSize).ToList();
             var falsePositiveCount = 0;
@@ -159,7 +159,7 @@ namespace Bloomn.Tests
         }
         
         
-        public void ChartFalsePositiveRates(BloomFilterParameters parameters, Func<IBloomFilter> factory, Func<int, IEnumerable<string>> keyFactory, int numberToInsert, int sampleSize, int sampleInterval)
+        public void ChartFalsePositiveRates(BloomFilterParameters parameters, Func<IBloomFilter<string>> factory, Func<int, IEnumerable<string>> keyFactory, int numberToInsert, int sampleSize, int sampleInterval)
         {
             var incrementalFalsePositiveCounts = new Dictionary<int, int>();
             var maxCapacityFalsePositiveCounts = new List<int>();
@@ -208,14 +208,14 @@ namespace Bloomn.Tests
 
             
             var averageIncrementalFpr = incrementalFalsePositiveCounts.Values.Select(x => x / (double) sampleSize).Average();
-            TestOutputHelper.WriteLine($"Average false positive rate while adding: {averageIncrementalFpr} (expected < {parameters.Dimensions.ErrorRate})");
+            TestOutputHelper.WriteLine($"Average false positive rate while adding: {averageIncrementalFpr} (expected < {parameters.Dimensions.FalsePositiveProbability})");
 
             var averageMaxedFpr = maxCapacityFalsePositiveCounts.Select(x => x / (double) sampleSize).Average();
-            TestOutputHelper.WriteLine($"Average false positive rate while at max capacity: {averageMaxedFpr} (expected < {parameters.Dimensions.ErrorRate})");
+            TestOutputHelper.WriteLine($"Average false positive rate while at max capacity: {averageMaxedFpr} (expected < {parameters.Dimensions.FalsePositiveProbability})");
             
-            averageIncrementalFpr.Should().BeLessOrEqualTo(parameters.Dimensions.ErrorRate);
-            var maxAcceptableErrorRate = parameters.Dimensions.ErrorRate + parameters.Dimensions.ErrorRate / 10;
-            averageMaxedFpr.Should().BeLessThan(maxAcceptableErrorRate, $"the false positive rate should be close to or less than the max acceptable rate {parameters.Dimensions.ErrorRate}" );
+            averageIncrementalFpr.Should().BeLessOrEqualTo(parameters.Dimensions.FalsePositiveProbability);
+            var maxAcceptableErrorRate = parameters.Dimensions.FalsePositiveProbability + parameters.Dimensions.FalsePositiveProbability / 10;
+            averageMaxedFpr.Should().BeLessThan(maxAcceptableErrorRate, $"the false positive rate should be close to or less than the max acceptable rate {parameters.Dimensions.FalsePositiveProbability}" );
             
             
         }
@@ -247,9 +247,9 @@ namespace Bloomn.Tests
             );
         }
 
-        public void VerifyContracts(BloomFilterParameters parameters, Func<IBloomFilter> factory, Func<int, IEnumerable<string>> keyFactory, int reps, int sampleSize, int threads)
+        public void VerifyContracts(BloomFilterParameters parameters, Func<IBloomFilter<string>> factory, Func<int, IEnumerable<string>> keyFactory, int reps, int sampleSize, int threads)
         {
-            var minimumCapacityForErrorRate = (1d / parameters.Dimensions.ErrorRate) * 10;
+            var minimumCapacityForErrorRate = (1d / parameters.Dimensions.FalsePositiveProbability) * 10;
             var logOfMinimimuCapacity = Math.Ceiling(Math.Log10(minimumCapacityForErrorRate));
             var logOfCapacity = Math.Ceiling(Math.Log10(sampleSize));
             logOfMinimimuCapacity.Should().BeLessThan(logOfCapacity, "you can't get meaningful stats if the inverse of the error rate is within an order of magnitude of the sample size");
@@ -279,7 +279,7 @@ namespace Bloomn.Tests
             var falsePositiveStats = new DescriptiveStatistics(falsePositiveRates);
             var timeStats = new DescriptiveStatistics(times);
 
-            TestOutputHelper.WriteLine($"Expected error rate: {parameters.Dimensions.ErrorRate}");
+            TestOutputHelper.WriteLine($"Expected error rate: {parameters.Dimensions.FalsePositiveProbability}");
             TestOutputHelper.WriteLine($"Reps: {reps}");
             TestOutputHelper.WriteLine($"Sample size: {sampleSize}");
             TestOutputHelper.WriteLine($"Observed error rate stats:");
@@ -296,12 +296,12 @@ namespace Bloomn.Tests
 
             if (reps == 1)
             {
-                falsePositiveStats.Mean.Should().BeLessThan(3 * parameters.Dimensions.ErrorRate, "the actual false positive rate should be less than triple the expected rate");
+                falsePositiveStats.Mean.Should().BeLessThan(3 * parameters.Dimensions.FalsePositiveProbability, "the actual false positive rate should be less than triple the expected rate");
             }
             else
             {
                 var minusOneStandardDeviation = falsePositiveStats.Mean - falsePositiveStats.StandardDeviation;
-                minusOneStandardDeviation.Should().BeLessThan(parameters.Dimensions.ErrorRate, "the actual false positive rate should be within 1 standard deviation of the expected false positive rate");
+                minusOneStandardDeviation.Should().BeLessThan(parameters.Dimensions.FalsePositiveProbability, "the actual false positive rate should be within 1 standard deviation of the expected false positive rate");
             }
 
             int GetFalsePositiveCount()

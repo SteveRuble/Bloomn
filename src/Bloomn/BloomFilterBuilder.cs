@@ -5,60 +5,61 @@ using Microsoft.Extensions.Options;
 
 namespace Bloomn
 {
-    public interface IBloomFilterOptionsBuilder
+    public interface IBloomFilterOptionsBuilder<TKey>
     {
-        IBloomFilterBuilder WithCapacityAndErrorRate(int capacity, double errorRate);
-
-        IBloomFilterBuilder WithDimensions(BloomFilterDimensions dimensions);
-        
-        IBloomFilterBuilder WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8);
-
-        IBloomFilterBuilder WithHasher(IKeyHasherFactory hasherFactory);
+        IBloomFilterBuilder<TKey> WithCapacityAndErrorRate(int capacity, double errorRate);
+        IBloomFilterBuilder<TKey> WithDimensions(BloomFilterDimensions dimensions);
+        IBloomFilterBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8);
+        IBloomFilterBuilder<TKey> WithHasher(IKeyHasherFactory<TKey> hasherFactory);
     }
     
-    public interface IBloomFilterBuilder: IBloomFilterOptionsBuilder
+    public interface IBloomFilterBuilder<TKey>: IBloomFilterOptionsBuilder<TKey>
     {
-        IBloomFilterBuilder WithOptions(BloomFilterOptions options);
-
-        IBloomFilterBuilder WithProfile(string profile);
-        
-        IBloomFilterBuilder WithState(BloomFilterState state);
-
-        IBloomFilter Build();
+        IBloomFilterBuilder<TKey> WithOptions(BloomFilterOptions<TKey> options);
+        IBloomFilterBuilder<TKey> WithProfile(string profile);
+        IBloomFilterBuilder<TKey> WithState(BloomFilterState state);
+        IBloomFilter<TKey> Build();
     }
 
-    internal class BloomFilterBuilder : IBloomFilterBuilder
+    internal class BloomFilterBuilder<TKey> : IBloomFilterBuilder<TKey>
     {
-        private readonly IOptionsSnapshot<BloomFilterOptions>? _optionsSnapshot;
-        internal BloomFilterOptions Options { get; set; }
+        private readonly IOptionsSnapshot<BloomFilterOptions<TKey>>? _optionsSnapshot;
+        internal BloomFilterOptions<TKey> Options { get; set; }
 
         internal BloomFilterState? State { get; set; }
 
-        public BloomFilterBuilder(IOptionsSnapshot<BloomFilterOptions> options)
+        public BloomFilterBuilder(IOptionsSnapshot<BloomFilterOptions<TKey>> options)
         {
             _optionsSnapshot = options;
             Options = options.Value;
         }
         
-        public BloomFilterBuilder(BloomFilterOptions options)
+        public BloomFilterBuilder(BloomFilterOptions<TKey> options)
         {
             Options = options;
         }
 
-        public IBloomFilterBuilder WithCapacityAndErrorRate(int capacity, double errorRate)
+        public IBloomFilterBuilder<TKey> WithCapacityAndErrorRate(int capacity, double errorRate)
         {
             return WithDimensions(BloomFilterDimensions.ForCapacityAndErrorRate(capacity, errorRate));
         }
 
-        public IBloomFilterBuilder WithDimensions(BloomFilterDimensions dimensions)
+        public IBloomFilterBuilder<TKey> WithDimensions(BloomFilterDimensions dimensions)
         {
-            Options.Dimensions = dimensions;
+            Options.Dimensions = new BloomFilterDimensionsBuilder
+            {
+                FalsePositiveProbability = dimensions.FalsePositiveProbability,
+                Capacity = dimensions.Capacity,
+                BitCount = dimensions.BitCount,
+                HashCount = dimensions.HashCount
+            };
+            
             return this;
         }
 
-        public IBloomFilterBuilder WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8)
+        public IBloomFilterBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8)
         {
-            Options.BloomFilterScaling = new BloomFilterScaling()
+            Options.Scaling = new BloomFilterScaling()
             {
                 MaxCapacityBehavior = MaxCapacityBehavior.Scale,
                 CapacityScaling = capacityScaling,
@@ -67,19 +68,19 @@ namespace Bloomn
             return this;
         }
 
-        public IBloomFilterBuilder WithHasher(IKeyHasherFactory hasherFactory)
+        public IBloomFilterBuilder<TKey> WithHasher(IKeyHasherFactory<TKey> hasherFactory)
         {
             Options.SetHasher(hasherFactory);
             return this;
         }
 
-        public IBloomFilterBuilder WithOptions(BloomFilterOptions options)
+        public IBloomFilterBuilder<TKey> WithOptions(BloomFilterOptions<TKey> options)
         {
             Options = options;
             return this;
         }
 
-        public IBloomFilterBuilder WithProfile(string profile)
+        public IBloomFilterBuilder<TKey> WithProfile(string profile)
         {
             if (_optionsSnapshot == null)
             {
@@ -89,7 +90,7 @@ namespace Bloomn
             return this;
         }
 
-        public IBloomFilterBuilder WithState(string? serializedState)
+        public IBloomFilterBuilder<TKey> WithState(string? serializedState)
         {
             if (serializedState == null)
             {
@@ -105,20 +106,20 @@ namespace Bloomn
             return WithState(state);
         }
 
-        public IBloomFilterBuilder WithState(BloomFilterState state)
+        public IBloomFilterBuilder<TKey> WithState(BloomFilterState state)
         {
             State = state;
             return this;
         }
         
-        public IBloomFilter Build()
+        public IBloomFilter<TKey> Build()
         {
             var id = State?.Parameters?.Id ?? Guid.NewGuid().ToString();
 
             var configuredParameters = new BloomFilterParameters(id)
             {
-                Dimensions = Options.Dimensions,
-                Scaling = Options.BloomFilterScaling,
+                Dimensions = Options.GetDimensions(),
+                Scaling = Options.Scaling,
                 HashAlgorithm = Options.GetHasher().Algorithm,
             };
 
@@ -160,10 +161,10 @@ namespace Bloomn
 
             if (state.Parameters.Scaling.MaxCapacityBehavior == MaxCapacityBehavior.Scale)
             {
-                return new ScalingBloomFilter(Options, state);
+                return new ScalingBloomFilter<TKey>(Options, state);
             }
 
-            return new ClassicBloomFilter(Options, state);
+            return new ClassicBloomFilter<TKey>(Options, state);
         }
     }
 }

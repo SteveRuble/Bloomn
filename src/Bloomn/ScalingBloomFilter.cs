@@ -6,31 +6,31 @@ using System.Threading;
 
 namespace Bloomn
 {
-    public sealed class ScalingBloomFilter : IBloomFilter
+    public sealed class ScalingBloomFilter<TKey> : IBloomFilter<TKey>
     {
-        private readonly List<ClassicBloomFilter> _filters = new();
+        private readonly List<ClassicBloomFilter<TKey>> _filters = new();
         private readonly ReaderWriterLockSlim _lock = new();
-        private readonly BloomFilterOptions _options;
+        private readonly BloomFilterOptions<TKey> _options;
         private readonly BloomFilterParameters _parameters;
         private readonly BloomFilterScaling _bloomFilterScaling;
         private readonly StateMetrics _metrics;
-        private ClassicBloomFilter _activeFilter;
+        private ClassicBloomFilter<TKey> _activeFilter;
 
         public BloomFilterParameters Parameters => _parameters;
 
-        public ScalingBloomFilter(BloomFilterParameters parameters) : this(BloomFilterOptions.DefaultOptions, new BloomFilterState {Parameters = parameters})
+        public ScalingBloomFilter(BloomFilterParameters parameters) : this(BloomFilterOptions<TKey>.DefaultOptions, new BloomFilterState {Parameters = parameters})
         {
         }
 
-        public ScalingBloomFilter(BloomFilterState state) : this(BloomFilterOptions.DefaultOptions, state)
+        public ScalingBloomFilter(BloomFilterState state) : this(BloomFilterOptions<TKey>.DefaultOptions, state)
         {
         }
 
-        public ScalingBloomFilter(BloomFilterOptions options, BloomFilterParameters parameters) : this(options, new BloomFilterState {Parameters = parameters})
+        public ScalingBloomFilter(BloomFilterOptions<TKey> options, BloomFilterParameters parameters) : this(options, new BloomFilterState {Parameters = parameters})
         {
         }
 
-        public ScalingBloomFilter(BloomFilterOptions options, BloomFilterState state)
+        public ScalingBloomFilter(BloomFilterOptions<TKey> options, BloomFilterState state)
         {
             if (state.Parameters == null)
             {
@@ -66,7 +66,7 @@ namespace Bloomn
                             throw new ArgumentException($"Invalid state: child filter {i} was missing parameters");
                         }
 
-                        return new ClassicBloomFilter(options, childState);
+                        return new ClassicBloomFilter<TKey>(options, childState);
                     }).ToList();
                     _activeFilter = _filters.Last();
                     _metrics.OnCapacityChanged(_filters.Sum(x => x.Parameters.Dimensions.Capacity));
@@ -79,8 +79,8 @@ namespace Bloomn
             }
             else if (state.BitArrays != null)
             {
-                _filters = new List<ClassicBloomFilter>();
-                _activeFilter = new ClassicBloomFilter(options, state);
+                _filters = new List<ClassicBloomFilter<TKey>>();
+                _activeFilter = new ClassicBloomFilter<TKey>(options, state);
             }
             else
             {
@@ -98,7 +98,7 @@ namespace Bloomn
 
         public double Saturation => _filters.Sum(x => x.Saturation) / _filters.Count;
 
-        public BloomFilterEntry Check(BloomFilterCheckRequest checkRequest)
+        public BloomFilterEntry Check(BloomFilterCheckRequest<TKey> checkRequest)
         {
             switch (checkRequest.Behavior)
             {
@@ -115,7 +115,7 @@ namespace Bloomn
 
                 case BloomFilterCheckBehavior.AddImmediately:
 
-                    using (var entry = PrepareAdd(new BloomFilterCheckRequest(checkRequest.Key, BloomFilterCheckBehavior.PrepareForAdd)))
+                    using (var entry = PrepareAdd(new BloomFilterCheckRequest<TKey>(checkRequest.Key, BloomFilterCheckBehavior.PrepareForAdd)))
                     {
                         if (entry.CanAdd)
                         {
@@ -186,7 +186,7 @@ namespace Bloomn
             }
         }
 
-        public bool IsNotPresent(BloomFilterCheckRequest checkRequest)
+        public bool IsNotPresent(BloomFilterCheckRequest<TKey> checkRequest)
         {
             try
             {
@@ -219,7 +219,7 @@ namespace Bloomn
         ///     again. It's important to dispose the returned struct to limit allocations.
         /// </summary>
         /// <returns>True if the set probably contains the item</returns>
-        private PreparedAdd PrepareAdd(BloomFilterCheckRequest checkRequest)
+        private PreparedAdd PrepareAdd(BloomFilterCheckRequest<TKey> checkRequest)
         {
             try
             {
@@ -234,7 +234,7 @@ namespace Bloomn
                     {
                         var filter = _filters[i];
 
-                        var isNotPresent = filter.Check(BloomFilterCheckRequest.CheckOnly(checkRequest.Key)).IsNotPresent;
+                        var isNotPresent = filter.Check(BloomFilterCheckRequest<TKey>.CheckOnly(checkRequest.Key)).IsNotPresent;
                         if (!isNotPresent)
                         {
                             _metrics.OnHit();
@@ -305,12 +305,12 @@ namespace Bloomn
                 {
                     // We need to create the filter with a lower error rate so that the compounded 
                     // error rate for all filters will stay below the requested rate.
-                    var rescaledErrorRate = _parameters.Dimensions.ErrorRate / (1 / (1 - _parameters.Scaling.FalsePositiveProbabilityScaling));
-                    bloomFilterDimensions = new BloomFilterDimensions.Computer()
+                    var rescaledErrorRate = _parameters.Dimensions.FalsePositiveProbability / (1 / (1 - _parameters.Scaling.FalsePositiveProbabilityScaling));
+                    bloomFilterDimensions = new BloomFilterDimensionsBuilder()
                     {
                         Capacity = bloomFilterDimensions.Capacity,
-                        FalsePositiveRate = rescaledErrorRate
-                    }.Compute();
+                        FalsePositiveProbability = rescaledErrorRate
+                    }.Build();
                 }
 
                 var nextParameters = _parameters with
@@ -318,7 +318,7 @@ namespace Bloomn
                     Id = $"{_parameters.Id}[{_filters.Count}]",
                     Dimensions = bloomFilterDimensions
                 };
-                _activeFilter = new ClassicBloomFilter(_options, new BloomFilterState()
+                _activeFilter = new ClassicBloomFilter<TKey>(_options, new BloomFilterState()
                 {
                     Parameters = nextParameters
                 });
@@ -327,22 +327,22 @@ namespace Bloomn
             else
             {
                 var nextBitCount = (int) Math.Round(_activeFilter.Parameters.Dimensions.BitCount * _bloomFilterScaling.CapacityScaling);
-                var nextErrorRate = _activeFilter.Parameters.Dimensions.ErrorRate * _bloomFilterScaling.FalsePositiveProbabilityScaling;
+                var nextErrorRate = _activeFilter.Parameters.Dimensions.FalsePositiveProbability * _bloomFilterScaling.FalsePositiveProbabilityScaling;
                 var nextHashCount = (int) Math.Ceiling(_activeFilter.Parameters.Dimensions.HashCount + _filters.Count * Math.Log2(Math.Pow(_activeFilter.Parameters.Scaling.FalsePositiveProbabilityScaling, -1)));
 
-                var nextDimensions = new BloomFilterDimensions.Computer()
+                var nextDimensions = new BloomFilterDimensionsBuilder()
                 {
                     BitCount = nextBitCount,
-                    FalsePositiveRate = nextErrorRate,
+                    FalsePositiveProbability = nextErrorRate,
                     HashCount = nextHashCount
-                }.Compute();
+                }.Build();
 
                 var nextParameters = (_parameters with
                 {
                     Id = $"{_parameters.Id}[{_filters.Count}]",
                     Dimensions = nextDimensions
                 });
-                _activeFilter = new ClassicBloomFilter(_options, new BloomFilterState()
+                _activeFilter = new ClassicBloomFilter<TKey>(_options, new BloomFilterState()
                 {
                     Parameters = nextParameters,
                 });

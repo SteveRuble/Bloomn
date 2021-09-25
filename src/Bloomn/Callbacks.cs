@@ -21,7 +21,7 @@ namespace Bloomn
         
         private readonly Callbacks _callbacks;
         public string Id { get; }
-        public double ErrorRate { get; }
+        public double FalsePositiveProbability { get; }
         public int Capacity { get; private set; }
         
         public long Count => _count;
@@ -34,7 +34,7 @@ namespace Bloomn
         {
             _callbacks = callbacks;
             Id = parameters.Id;
-            ErrorRate = parameters.Dimensions.ErrorRate;
+            FalsePositiveProbability = parameters.Dimensions.FalsePositiveProbability;
             Capacity = parameters.Dimensions.Capacity;
             BitCount = parameters.Dimensions.BitCount;
             HashCount = parameters.Dimensions.HashCount;

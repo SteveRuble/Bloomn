@@ -1,16 +1,36 @@
 using System;
+using System.Runtime.InteropServices;
 
 namespace Bloomn
 {
-    public class Murmur3HasherFactory : IKeyHasherFactory
+    public class Murmur3HasherFactory : 
+        IKeyHasherFactory<string>,
+        IKeyHasherFactory<byte[]>
     {
         public string Algorithm => "murmur3";
-
-        public uint Hash(ReadOnlySpan<byte> key, int seed)
+        public Func<string, uint> CreateHasher(int seed, int modulus)
         {
-            return Compute(key, (uint)key.Length, (uint)seed);
-        }
+            var useed = (uint) seed;
+
+            return (key) =>
+            {
+                var bytes = MemoryMarshal.AsBytes(key.AsSpan());
+                var h = Compute(bytes, (uint) bytes.Length, useed);
+                return (uint) (h % modulus);
+            };
+        }     
         
+        Func<byte[], uint> IKeyHasherFactory<byte[]>.CreateHasher(int seed, int modulus)
+        {
+            var useed = (uint) seed;
+
+            return (key) =>
+            {
+                var h = Compute(key, (uint) key.Length, useed);
+                return (uint) (h % modulus);
+            };
+        }
+
         public static uint Compute(ReadOnlySpan<byte> data, uint length, uint seed)
         {
             uint nblocks = length >> 2;

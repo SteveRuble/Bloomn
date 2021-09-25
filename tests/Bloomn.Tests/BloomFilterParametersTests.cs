@@ -35,7 +35,7 @@ namespace Bloomn.Tests
                 {
                     Capacity = 1,
                     BitCount = 2,
-                    ErrorRate = 3,
+                    FalsePositiveProbability = 3,
                     HashCount = 4
                 },
                 Scaling = new BloomFilterScaling()
@@ -53,7 +53,7 @@ namespace Bloomn.Tests
                 {
                     Capacity = 7,
                     BitCount = 6,
-                    ErrorRate = 5,
+                    FalsePositiveProbability = 5,
                     HashCount = 4
                 },
                 Scaling = new BloomFilterScaling()
