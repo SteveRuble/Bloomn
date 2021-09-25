@@ -10,7 +10,7 @@ namespace Bloomn.Tests
         [Fact]
         public void CanRoundTripStateWithoutChildren()
         {
-            var expected = new BloomFilterState()
+            var expected = new BloomFilterState
             {
                 Parameters = new BloomFilterParameters("id1")
                 {
@@ -19,10 +19,10 @@ namespace Bloomn.Tests
                     HashAlgorithm = "test"
                 },
                 Count = 1234,
-                BitArrays = new List<byte[]>()
+                BitArrays = new List<byte[]>
                 {
                     Encoding.ASCII.GetBytes("some bytes"),
-                    Encoding.ASCII.GetBytes("some more bytes"),
+                    Encoding.ASCII.GetBytes("some more bytes")
                 }
             };
 
@@ -37,7 +37,7 @@ namespace Bloomn.Tests
         [Fact]
         public void CanRoundTripStateWithChildren()
         {
-            var expected = new BloomFilterState()
+            var expected = new BloomFilterState
             {
                 Parameters = new BloomFilterParameters("id1")
                 {
@@ -46,9 +46,9 @@ namespace Bloomn.Tests
                     HashAlgorithm = "test"
                 },
                 Count = 1234,
-                Children = new List<BloomFilterState>()
+                Children = new List<BloomFilterState>
                 {
-                    new BloomFilterState()
+                    new()
                     {
                         Parameters = new BloomFilterParameters("id1.1")
                         {
@@ -57,13 +57,13 @@ namespace Bloomn.Tests
                             HashAlgorithm = "test"
                         },
                         Count = 1234,
-                        BitArrays = new List<byte[]>()
+                        BitArrays = new List<byte[]>
                         {
                             Encoding.ASCII.GetBytes("some bytes"),
-                            Encoding.ASCII.GetBytes("some more bytes"),
+                            Encoding.ASCII.GetBytes("some more bytes")
                         }
                     },
-                    new BloomFilterState()
+                    new()
                     {
                         Parameters = new BloomFilterParameters("id1.2")
                         {
@@ -72,12 +72,12 @@ namespace Bloomn.Tests
                             HashAlgorithm = "test"
                         },
                         Count = 1234,
-                        BitArrays = new List<byte[]>()
+                        BitArrays = new List<byte[]>
                         {
                             Encoding.ASCII.GetBytes("some bytes"),
-                            Encoding.ASCII.GetBytes("some more bytes"),
+                            Encoding.ASCII.GetBytes("some more bytes")
                         }
-                    },
+                    }
                 }
             };
 

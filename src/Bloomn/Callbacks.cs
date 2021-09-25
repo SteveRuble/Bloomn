@@ -14,21 +14,11 @@ namespace Bloomn
         public Action<string>? OnFalsePositive { get; set; }
     }
 
-    internal class StateMetrics: IBloomFilterDimensions
+    internal class StateMetrics : IBloomFilterDimensions
     {
+        private readonly Callbacks _callbacks;
         private long _count;
         private int _setBitCount;
-        
-        private readonly Callbacks _callbacks;
-        public string Id { get; }
-        public double FalsePositiveProbability { get; }
-        public int Capacity { get; private set; }
-        
-        public long Count => _count;
-        public int BitCount { get; private set; }
-        public int HashCount { get; private set; }
-
-        public int SetBitCount => _setBitCount;
 
         public StateMetrics(BloomFilterParameters parameters, Callbacks callbacks)
         {
@@ -39,14 +29,24 @@ namespace Bloomn
             BitCount = parameters.Dimensions.BitCount;
             HashCount = parameters.Dimensions.HashCount;
         }
-        
+
+        public string Id { get; }
+
+        public long Count => _count;
+
+        public int SetBitCount => _setBitCount;
+        public double FalsePositiveProbability { get; }
+        public int Capacity { get; private set; }
+        public int BitCount { get; private set; }
+        public int HashCount { get; }
+
         public void OnCapacityChanged(int value)
         {
             Capacity = value;
             _callbacks.OnCapacityChanged?.Invoke(Id, value);
         }
 
-        public void IncrementCount(long amount) 
+        public void IncrementCount(long amount)
         {
             var value = Interlocked.Add(ref _count, amount);
             _callbacks.OnCountChanged?.Invoke(Id, value);
@@ -56,7 +56,7 @@ namespace Bloomn
         {
             Interlocked.Add(ref _setBitCount, amount);
         }
-        
+
         public void OnCountChanged(long value)
         {
             _count = value;
@@ -69,9 +69,24 @@ namespace Bloomn
             _callbacks.OnBitCountChanged?.Invoke(Id, value);
         }
 
-        public void OnScaled(BloomFilterParameters parameters) => _callbacks.OnScaled?.Invoke(Id, parameters);
-        public void OnHit() => _callbacks.OnHit?.Invoke(Id);
-        public void OnMiss() => _callbacks.OnMiss?.Invoke(Id);
-        public void OnFalsePositive() => _callbacks.OnFalsePositive?.Invoke(Id);
+        public void OnScaled(BloomFilterParameters parameters)
+        {
+            _callbacks.OnScaled?.Invoke(Id, parameters);
+        }
+
+        public void OnHit()
+        {
+            _callbacks.OnHit?.Invoke(Id);
+        }
+
+        public void OnMiss()
+        {
+            _callbacks.OnMiss?.Invoke(Id);
+        }
+
+        public void OnFalsePositive()
+        {
+            _callbacks.OnFalsePositive?.Invoke(Id);
+        }
     }
 }

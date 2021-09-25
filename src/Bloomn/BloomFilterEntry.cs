@@ -4,10 +4,14 @@ namespace Bloomn
 {
     public readonly struct BloomFilterEntry : IDisposable
     {
-        public static readonly BloomFilterEntry MaybePresent = new BloomFilterEntry(false, PreparedAdd.AlreadyAdded);
-        public static readonly BloomFilterEntry NotPresent = new BloomFilterEntry(true, PreparedAdd.AlreadyAdded);
-        public static BloomFilterEntry Addable(PreparedAdd preparedAdd) => new BloomFilterEntry(true, preparedAdd);
-        
+        public static readonly BloomFilterEntry MaybePresent = new(false, PreparedAdd.AlreadyAdded);
+        public static readonly BloomFilterEntry NotPresent = new(true, PreparedAdd.AlreadyAdded);
+
+        public static BloomFilterEntry Addable(PreparedAdd preparedAdd)
+        {
+            return new(true, preparedAdd);
+        }
+
         public readonly bool IsNotPresent;
         public readonly PreparedAdd PreparedAdd;
 

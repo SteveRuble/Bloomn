@@ -1,31 +1,28 @@
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Runtime.InteropServices.ComTypes;
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Bloomn.Tests
 {
-    public class ScalableBloomFilterTests : BloomFilterTestsBase
+    public class ScalingFilterTests : BloomFilterTestsBase
     {
-        public ScalableBloomFilterTests(ITestOutputHelper testOutputHelper) : base(testOutputHelper)
+        public ScalingFilterTests(ITestOutputHelper testOutputHelper) : base(testOutputHelper)
         {
         }
 
         public override IBloomFilter<string> Create(BloomFilterOptions<string> options, BloomFilterParameters parameters)
         {
-            parameters = parameters.WithScaling(2, 0.8);
-            
-            return new ScalingBloomFilter<string>(options, new BloomFilterState()
+            parameters = parameters.WithScaling();
+
+            return new ScalingBloomFilter<string>(options, new BloomFilterState
             {
                 Parameters = parameters
             });
         }
-        
+
         /// <summary>
-        /// These tests are intended to be more debuggable and to provide a baseline for correct behavior.
-        /// They use the same set of keys on every run and log events.
+        ///     These tests are intended to be more debuggable and to provide a baseline for correct behavior.
+        ///     They use the same set of keys on every run and log events.
         /// </summary>
         /// <param name="count"></param>
         /// <param name="capacity"></param>
@@ -33,8 +30,8 @@ namespace Bloomn.Tests
         /// <param name="threads"></param>
         /// <param name="maxErrorRate"></param>
         [Theory]
-        [InlineData(10000, 1000,  0.01, 1)]
-        [InlineData(10000, 1000,  0.01, 8)]
+        [InlineData(10000, 1000, 0.01, 1)]
+        [InlineData(10000, 1000, 0.01, 8)]
         public void PredictableStringsTestsWithScaling(int count, int capacity, double errorRate, int threads)
         {
             var parameters = new BloomFilterParameters("test")
@@ -48,11 +45,11 @@ namespace Bloomn.Tests
                 count,
                 threads
             );
-        }    
-        
+        }
+
         /// <summary>
-        /// These tests focus on performance and statistical correctness. They use random values on each run
-        /// and run many reps of the same parameters to build a statistical picture of the behavior of the implementation.
+        ///     These tests focus on performance and statistical correctness. They use random values on each run
+        ///     and run many reps of the same parameters to build a statistical picture of the behavior of the implementation.
         /// </summary>
         /// <param name="reps"></param>
         /// <param name="count"></param>
@@ -60,8 +57,8 @@ namespace Bloomn.Tests
         /// <param name="errorRate"></param>
         /// <param name="threads"></param>
         [Theory]
-        [InlineData(4, 10000, 1000,  0.01, 1)]
-        [InlineData(4, 10000, 1000,  0.01, 4)]
+        [InlineData(4, 10000, 1000, 0.01, 1)]
+        [InlineData(4, 10000, 1000, 0.01, 4)]
         public void RandomStringsTestsWithScaling(int reps, int count, int capacity, double errorRate, int threads)
         {
             var parameters = new BloomFilterParameters("test")
@@ -74,7 +71,7 @@ namespace Bloomn.Tests
                 count,
                 1000,
                 100
-                );
+            );
 
             VerifyContracts(
                 parameters,
@@ -84,9 +81,9 @@ namespace Bloomn.Tests
                 count,
                 threads
             );
-        }    
+        }
 
-        
+
         [Fact]
         public void CanExportAndImportState()
         {
@@ -94,14 +91,14 @@ namespace Bloomn.Tests
                 .WithCapacityAndErrorRate(100, 0.1)
                 .WithScaling();
 
-            var first = new ScalingBloomFilter<string>(new BloomFilterOptions<string>()
+            var first = new ScalingBloomFilter<string>(new BloomFilterOptions<string>
             {
-                Callbacks = new Callbacks()
+                Callbacks = new Callbacks
                 {
-                    OnScaled = (id,p) => TestOutputHelper.WriteLine($"{id} {p}")
+                    OnScaled = (id, p) => TestOutputHelper.WriteLine($"{id} {p}")
                 }
             }, parameters);
-            
+
             // Populate with data
             ChartFalsePositiveRates(parameters, () => first, RandomStrings, 10000, 100, 1000);
 
@@ -112,7 +109,7 @@ namespace Bloomn.Tests
             var secondState = BloomFilterState.Deserialize(serializedFirstState);
 
             var second = new ScalingBloomFilter<string>(secondState);
-            
+
             second.Parameters.Should().BeEquivalentTo(first.Parameters);
 
             second.Count.Should().Be(first.Count);
@@ -121,6 +118,6 @@ namespace Bloomn.Tests
 
             fpr.Should().BeGreaterThan(0, "there should be some false positives");
             fpr.Should().BeLessOrEqualTo(parameters.Dimensions.FalsePositiveProbability, "the filter should behave correctly");
-        }    
+        }
     }
 }

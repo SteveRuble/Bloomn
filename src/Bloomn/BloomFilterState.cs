@@ -1,14 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Bloomn
 {
     public class BloomFilterState
     {
+        private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = {new StateJsonSerializer()}
+        };
+
         public string ApiVersion { get; set; } = "v1";
 
         public BloomFilterParameters? Parameters { get; set; }
@@ -23,7 +28,7 @@ namespace Bloomn
         {
             try
             {
-                return System.Text.Json.JsonSerializer.Serialize(this, typeof(BloomFilterState), JsonSerializerOptions);
+                return JsonSerializer.Serialize(this, typeof(BloomFilterState), JsonSerializerOptions);
             }
             catch (Exception ex)
             {
@@ -36,7 +41,7 @@ namespace Bloomn
             BloomFilterState? state;
             try
             {
-                state = System.Text.Json.JsonSerializer.Deserialize<BloomFilterState>(serialized, JsonSerializerOptions);
+                state = JsonSerializer.Deserialize<BloomFilterState>(serialized, JsonSerializerOptions);
             }
             catch (Exception ex)
             {
@@ -51,13 +56,7 @@ namespace Bloomn
             return state;
         }
 
-        private static readonly JsonSerializerOptions JsonSerializerOptions = new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters = {new StateJsonSerializer()}
-        };
-
-        private class StateJsonSerializer : System.Text.Json.Serialization.JsonConverter<BloomFilterState>
+        private class StateJsonSerializer : JsonConverter<BloomFilterState>
         {
             public override BloomFilterState Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
@@ -109,10 +108,7 @@ namespace Bloomn
                 {
                     writer.WritePropertyName("bits");
                     writer.WriteStartArray();
-                    foreach (var bitArray in value.BitArrays)
-                    {
-                        writer.WriteBase64StringValue(bitArray);
-                    }
+                    foreach (var bitArray in value.BitArrays) writer.WriteBase64StringValue(bitArray);
 
                     writer.WriteEndArray();
                 }
@@ -121,10 +117,7 @@ namespace Bloomn
                 {
                     writer.WritePropertyName("children");
                     writer.WriteStartArray();
-                    foreach (var child in value.Children)
-                    {
-                        JsonSerializer.Serialize(writer, child, options);
-                    }
+                    foreach (var child in value.Children) JsonSerializer.Serialize(writer, child, options);
 
                     writer.WriteEndArray();
                 }

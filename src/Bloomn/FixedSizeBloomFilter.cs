@@ -6,29 +6,30 @@ using System.Threading;
 
 namespace Bloomn
 {
-    public class ClassicBloomFilter<T> : IBloomFilter<T>
+    public sealed class FixedSizeBloomFilter<T> : IBloomFilter<T>
     {
         /// <summary>
         ///     Seed used for second hash.
         /// </summary>
         private const int Hash2Seed = 1234567;
 
-        private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
-
-        private readonly int _bitCount;
-        private readonly int _hashCount;
-        private readonly StateMetrics _metrics;
-        private readonly ArrayPool<int> _indexPool;
-        private readonly Func<T, uint> _hasher1;
-        private readonly Func<T, uint> _hasher2;
+        private readonly int _actualBitCount;
         private readonly BitArray[] _bitArrays;
 
+        private readonly int _bitCount;
+
         private readonly int _bitsPerSlice;
-        private readonly int _actualBitCount;
-        
+        private readonly int _hashCount;
+        private readonly Func<T, uint> _hasher1;
+        private readonly Func<T, uint> _hasher2;
+        private readonly ArrayPool<int> _indexPool;
+
+        private readonly ReaderWriterLockSlim _lock = new();
+        private readonly StateMetrics _metrics;
+
         internal MaxCapacityBehavior MaxCapacityBehavior;
 
-        public ClassicBloomFilter(BloomFilterOptions<T> options, BloomFilterState state)
+        public FixedSizeBloomFilter(BloomFilterOptions<T> options, BloomFilterState state)
         {
             if (state.Parameters == null)
             {
@@ -56,8 +57,8 @@ namespace Bloomn
 
             _metrics.IncrementSetBitCount(_bitArrays.Sum(x => x.OfType<bool>().Count(x => x)));
             _metrics.IncrementCount(state.Count);
-            
-            
+
+
             MaxCapacityBehavior = Parameters.Scaling.MaxCapacityBehavior;
             _bitCount = Parameters.Dimensions.BitCount;
             _hashCount = Parameters.Dimensions.HashCount;
@@ -66,34 +67,6 @@ namespace Bloomn
 
             _hasher1 = hasherFactory.CreateHasher(0, _bitsPerSlice);
             _hasher2 = hasherFactory.CreateHasher(Hash2Seed, _bitsPerSlice);
-        }
-
-        internal static int ComputeBitsPerSlice(int bitCount, int hashCount)
-        {
-            var n = bitCount / hashCount;
-            // Hash distribution is best when modded by a prime number
-            if (n % 2 == 0)
-            {
-                n++;
-            }
-
-            // The maximum prime gap at 1,346,294,310,749 is 582 so we should never hit it
-            var safety = n + 582;
-            int i, j;
-            for (i = n; i < safety; i += 2)
-            {
-                var limit = Math.Sqrt(i);
-                for (j = 3; j <= limit; j += 2)
-                {
-                    if (i % j == 0)
-                        break;
-                }
-
-                if (j > limit)
-                    return i;
-            }
-
-            throw new Exception($"Prime above {n} not found in a reasonable time (your filter must be unreasonably large).");
         }
 
 
@@ -130,6 +103,55 @@ namespace Bloomn
                 default:
                     throw new ArgumentOutOfRangeException(nameof(checkRequest));
             }
+        }
+
+        public string Id => Parameters.Id;
+        public IBloomFilterDimensions Dimensions => Parameters.Dimensions;
+
+        public BloomFilterState GetState()
+        {
+            var state = new BloomFilterState
+            {
+                Parameters = Parameters,
+                Count = Count,
+                BitArrays = _bitArrays.Select(x =>
+                {
+                    var bytes = new byte[_bitsPerSlice];
+                    x.CopyTo(bytes, 0);
+                    return bytes;
+                }).ToList()
+            };
+            return state;
+        }
+
+        internal static int ComputeBitsPerSlice(int bitCount, int hashCount)
+        {
+            var n = bitCount / hashCount;
+            // Hash distribution is best when modded by a prime number
+            if (n % 2 == 0)
+            {
+                n++;
+            }
+
+            // The maximum prime gap at 1,346,294,310,749 is 582 so we should never hit it
+            var safety = n + 582;
+            int i, j;
+            for (i = n; i < safety; i += 2)
+            {
+                var limit = Math.Sqrt(i);
+                for (j = 3; j <= limit; j += 2)
+                    if (i % j == 0)
+                    {
+                        break;
+                    }
+
+                if (j > limit)
+                {
+                    return i;
+                }
+            }
+
+            throw new Exception($"Prime above {n} not found in a reasonable time (your filter must be unreasonably large).");
         }
 
         public bool IsNotPresent(BloomFilterCheckRequest<T> checkRequest)
@@ -186,12 +208,12 @@ namespace Bloomn
                 var maybePresent = true;
                 var key = checkRequest.Key;
 
-                var hash1 = (int)_hasher1(key);
+                var hash1 = (int) _hasher1(key);
                 var index = hash1;
                 maybePresent &= GetBit(0, index);
                 indexes[0] = index;
 
-                var hash2 = (int)_hasher2(key);
+                var hash2 = (int) _hasher2(key);
                 index = hash2;
                 if (maybePresent)
                 {
@@ -262,9 +284,6 @@ namespace Bloomn
             }
         }
 
-        public string Id => Parameters.Id;
-        public IBloomFilterDimensions Dimensions => Parameters.Dimensions;
-
         public bool ApplyPreparedAdd(PreparedAdd preparedAdd)
         {
             _lock.EnterWriteLock();
@@ -274,7 +293,7 @@ namespace Bloomn
                 var madeChange = false;
                 if (preparedAdd.Indexes != null)
                 {
-                    for (int i = 0; i < _hashCount; i++)
+                    for (var i = 0; i < _hashCount; i++)
                     {
                         var index = preparedAdd.Indexes[i];
                         madeChange |= !SetBitAndReturnPreviousState(i, index);
@@ -336,25 +355,9 @@ namespace Bloomn
             {
                 throw new BloomFilterException(BloomFilterExceptionCode.MaxCapacityExceeded,
                     $"Cannot add to filter because filter is at maximum capacity {Parameters.Dimensions.Capacity}. " +
-                    $"Adding more entries would increase the false positive rate above the configured value. " +
-                    $"Perhaps you should enable scaling.");
+                    "Adding more entries would increase the false positive rate above the configured value. " +
+                    "Perhaps you should enable scaling.");
             }
-        }
-
-        public BloomFilterState GetState()
-        {
-            var state = new BloomFilterState
-            {
-                Parameters = Parameters,
-                Count = Count,
-                BitArrays = _bitArrays.Select(x =>
-                {
-                    var bytes = new byte[_bitsPerSlice];
-                    x.CopyTo(bytes, 0);
-                    return bytes;
-                }).ToList(),
-            };
-            return state;
         }
     }
 }

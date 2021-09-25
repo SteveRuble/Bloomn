@@ -19,7 +19,7 @@ namespace Bloomn
             CanAdd = add != null && release != null && indexes != null;
         }
 
-        public static readonly PreparedAdd AlreadyAdded = new PreparedAdd("AlreadyAdded", null, null, null);
+        public static readonly PreparedAdd AlreadyAdded = new("AlreadyAdded", null, null, null);
 
         public bool Add()
         {

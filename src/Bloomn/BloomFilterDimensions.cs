@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Bloomn
@@ -15,41 +14,6 @@ namespace Bloomn
 
     public record BloomFilterDimensions : IBloomFilterDimensions
     {
-        /// <summary>
-        /// These are the equations which relate the bloom filter parameters.
-        /// n => max items before invariants are broken
-        /// m => number of bits
-        /// k => number of hashes
-        /// p => false positive rate
-        /// </summary>
-        internal static class Equations
-        {
-            // ReSharper disable InconsistentNaming
-
-            // n = ceil(m / (-k / log(1 - exp(log(p) / k))))
-            // p = pow(1 - exp(-k / (m / n)), k)
-            // m = ceil((n * log(p)) / log(1 / pow(2, log(2))));
-            // k = round((m / n) * log(2));
-
-
-            public static int n(int m, int k, double p) => (int) Math.Ceiling(m / (-k / Math.Log(1 - Math.Exp(Math.Log(p) / k))));
-
-            public static double p(int m, int n, int k) => Math.Pow(1 - Math.Exp(-k / (m / (double) n)), k);
-
-            public static int m(int n, double p) => (int) Math.Ceiling((n * Math.Log(p)) / Math.Log(1 / Math.Pow(2, Math.Log(2))));
-
-            public static int k(int m, int n) => (int) Math.Round((m / (double) n) * Math.Log(2));
-            
-            public static int k(double p) => (int)Math.Round(-Math.Log2(p));
-
-            // ReSharper restore InconsistentNaming
-        }
-
-        public double FalsePositiveProbability { get; init; }
-        public int Capacity { get; init; }
-        public int BitCount { get; init; }
-        public int HashCount { get; init; }
-        
         public BloomFilterDimensions(double falsePositiveProbability = 0.01, int capacity = 10000, int bitCount = 95851, int hashCount = 7)
         {
             if (hashCount < 2)
@@ -63,11 +27,16 @@ namespace Bloomn
             HashCount = hashCount;
         }
 
+        public double FalsePositiveProbability { get; init; }
+        public int Capacity { get; init; }
+        public int BitCount { get; init; }
+        public int HashCount { get; init; }
+
         public static BloomFilterDimensions ForCapacityAndErrorRate(int capacity, double errorRate)
         {
-            return new BloomFilterDimensionsBuilder()
+            return new BloomFilterDimensionsBuilder
             {
-                Capacity = capacity, 
+                Capacity = capacity,
                 FalsePositiveProbability = errorRate
             }.Build();
         }
@@ -120,6 +89,51 @@ namespace Bloomn
 
             return diff;
         }
+
+        /// <summary>
+        ///     These are the equations which relate the bloom filter parameters.
+        ///     n => max items before invariants are broken
+        ///     m => number of bits
+        ///     k => number of hashes
+        ///     p => false positive rate
+        /// </summary>
+        internal static class Equations
+        {
+            // ReSharper disable InconsistentNaming
+
+            // n = ceil(m / (-k / log(1 - exp(log(p) / k))))
+            // p = pow(1 - exp(-k / (m / n)), k)
+            // m = ceil((n * log(p)) / log(1 / pow(2, log(2))));
+            // k = round((m / n) * log(2));
+
+
+            public static int n(int m, int k, double p)
+            {
+                return (int) Math.Ceiling(m / (-k / Math.Log(1 - Math.Exp(Math.Log(p) / k))));
+            }
+
+            public static double p(int m, int n, int k)
+            {
+                return Math.Pow(1 - Math.Exp(-k / (m / (double) n)), k);
+            }
+
+            public static int m(int n, double p)
+            {
+                return (int) Math.Ceiling(n * Math.Log(p) / Math.Log(1 / Math.Pow(2, Math.Log(2))));
+            }
+
+            public static int k(int m, int n)
+            {
+                return (int) Math.Round(m / (double) n * Math.Log(2));
+            }
+
+            public static int k(double p)
+            {
+                return (int) Math.Round(-Math.Log2(p));
+            }
+
+            // ReSharper restore InconsistentNaming
+        }
     }
 
     public class BloomFilterDimensionsBuilder
@@ -136,11 +150,11 @@ namespace Bloomn
         public bool FullySpecified => FalsePositiveProbability != null && Capacity != null && BitCount != null && HashCount != null;
 
         public bool Buildable =>
-            (Capacity.HasValue && FalsePositiveProbability.HasValue)
-            || (FalsePositiveProbability.HasValue && BitCount.HasValue)
-            || (Capacity.HasValue && FalsePositiveProbability.HasValue)
-            || (Capacity.HasValue && BitCount.HasValue)
-            || (FalsePositiveProbability.HasValue && BitCount.HasValue);
+            Capacity.HasValue && FalsePositiveProbability.HasValue
+            || FalsePositiveProbability.HasValue && BitCount.HasValue
+            || Capacity.HasValue && FalsePositiveProbability.HasValue
+            || Capacity.HasValue && BitCount.HasValue
+            || FalsePositiveProbability.HasValue && BitCount.HasValue;
 
         public BloomFilterDimensions Build()
         {
@@ -158,8 +172,8 @@ namespace Bloomn
                     HashCount = BloomFilterDimensions.Equations.k(BitCount.Value, Capacity.Value);
                     makingProgress = true;
                     continue;
-                }  
-                    
+                }
+
                 if (!HashCount.HasValue && FalsePositiveProbability.HasValue)
                 {
                     HashCount = BloomFilterDimensions.Equations.k(FalsePositiveProbability.Value);
@@ -185,7 +199,6 @@ namespace Bloomn
                 {
                     FalsePositiveProbability = BloomFilterDimensions.Equations.p(BitCount.Value, Capacity.Value, HashCount.Value);
                     makingProgress = true;
-                    continue;
                 }
             }
 

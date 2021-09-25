@@ -1,3 +1,3 @@
+using System.Runtime.CompilerServices;
 
-
-[assembly:System.Runtime.CompilerServices.InternalsVisibleTo("Bloomn.Tests")]
+[assembly: InternalsVisibleTo("Bloomn.Tests")]

@@ -8,27 +8,37 @@ namespace Bloomn.Extensions
 {
     public class BloomFilterConfigurationBuilder<TKey>
     {
-        private IServiceCollection ServiceCollection { get; }
-
         public BloomFilterConfigurationBuilder(IServiceCollection serviceCollection)
         {
             ServiceCollection = serviceCollection;
         }
 
-        public BloomFilterConfigurationBuilder<TKey> WithDefaultProfile(Action<IBloomFilterOptionsBuilder<TKey>> configureOptions) 
-            => WithDefaultProfile(null, configureOptions);
+        private IServiceCollection ServiceCollection { get; }
 
-        public BloomFilterConfigurationBuilder<TKey> WithDefaultProfile(IConfiguration configurationSection) 
-            => WithDefaultProfile(configurationSection, null);
+        public BloomFilterConfigurationBuilder<TKey> WithDefaultProfile(Action<IBloomFilterOptionsBuilder<TKey>> configureOptions)
+        {
+            return WithDefaultProfile(null, configureOptions);
+        }
 
-        public BloomFilterConfigurationBuilder<TKey> WithDefaultProfile(IConfiguration? configurationSection, Action<IBloomFilterOptionsBuilder<TKey>>? configureOptions) 
-            => WithProfile(Options.DefaultName, configurationSection, configureOptions);
+        public BloomFilterConfigurationBuilder<TKey> WithDefaultProfile(IConfiguration configurationSection)
+        {
+            return WithDefaultProfile(configurationSection, null);
+        }
+
+        public BloomFilterConfigurationBuilder<TKey> WithDefaultProfile(IConfiguration? configurationSection, Action<IBloomFilterOptionsBuilder<TKey>>? configureOptions)
+        {
+            return WithProfile(Options.DefaultName, configurationSection, configureOptions);
+        }
 
         public BloomFilterConfigurationBuilder<TKey> WithProfile(string name, Action<IBloomFilterOptionsBuilder<TKey>> configureOptions)
-            => WithProfile(name, null, configureOptions);
+        {
+            return WithProfile(name, null, configureOptions);
+        }
 
         public BloomFilterConfigurationBuilder<TKey> WithProfile(string name, IConfiguration configurationSection)
-            => WithProfile(name, configurationSection, null);
+        {
+            return WithProfile(name, configurationSection, null);
+        }
 
         public BloomFilterConfigurationBuilder<TKey> WithProfile(string name, IConfiguration? configurationSection, Action<IBloomFilterOptionsBuilder<TKey>>? configureOptions)
         {
@@ -45,7 +55,7 @@ namespace Bloomn.Extensions
                     configureOptions(builder);
                 });
             }
-            
+
             return this;
         }
     }
@@ -55,7 +65,7 @@ namespace Bloomn.Extensions
         public static IServiceCollection AddBloomFilters<TKey>(this IServiceCollection serviceCollection, Action<BloomFilterConfigurationBuilder<TKey>>? configure = null)
         {
             serviceCollection.AddOptions();
-  
+
             if (configure != null)
             {
                 var builder = new BloomFilterConfigurationBuilder<TKey>(serviceCollection);

@@ -12,8 +12,8 @@ namespace Bloomn
         IBloomFilterBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8);
         IBloomFilterBuilder<TKey> WithHasher(IKeyHasherFactory<TKey> hasherFactory);
     }
-    
-    public interface IBloomFilterBuilder<TKey>: IBloomFilterOptionsBuilder<TKey>
+
+    public interface IBloomFilterBuilder<TKey> : IBloomFilterOptionsBuilder<TKey>
     {
         IBloomFilterBuilder<TKey> WithOptions(BloomFilterOptions<TKey> options);
         IBloomFilterBuilder<TKey> WithProfile(string profile);
@@ -24,20 +24,21 @@ namespace Bloomn
     internal class BloomFilterBuilder<TKey> : IBloomFilterBuilder<TKey>
     {
         private readonly IOptionsSnapshot<BloomFilterOptions<TKey>>? _optionsSnapshot;
-        internal BloomFilterOptions<TKey> Options { get; set; }
-
-        internal BloomFilterState? State { get; set; }
 
         public BloomFilterBuilder(IOptionsSnapshot<BloomFilterOptions<TKey>> options)
         {
             _optionsSnapshot = options;
             Options = options.Value;
         }
-        
+
         public BloomFilterBuilder(BloomFilterOptions<TKey> options)
         {
             Options = options;
         }
+
+        internal BloomFilterOptions<TKey> Options { get; set; }
+
+        internal BloomFilterState? State { get; set; }
 
         public IBloomFilterBuilder<TKey> WithCapacityAndErrorRate(int capacity, double errorRate)
         {
@@ -53,13 +54,13 @@ namespace Bloomn
                 BitCount = dimensions.BitCount,
                 HashCount = dimensions.HashCount
             };
-            
+
             return this;
         }
 
         public IBloomFilterBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8)
         {
-            Options.Scaling = new BloomFilterScaling()
+            Options.Scaling = new BloomFilterScaling
             {
                 MaxCapacityBehavior = MaxCapacityBehavior.Scale,
                 CapacityScaling = capacityScaling,
@@ -86,24 +87,9 @@ namespace Bloomn
             {
                 throw new InvalidOperationException("This builder was not ");
             }
+
             Options = _optionsSnapshot.Get(profile);
             return this;
-        }
-
-        public IBloomFilterBuilder<TKey> WithState(string? serializedState)
-        {
-            if (serializedState == null)
-            {
-                return this;
-            }
-
-            var state = JsonSerializer.Deserialize<BloomFilterState>(serializedState);
-            if (state == null)
-            {
-                throw new ArgumentException("Serialized state deserialized to null.", nameof(serializedState));
-            } 
-            
-            return WithState(state);
         }
 
         public IBloomFilterBuilder<TKey> WithState(BloomFilterState state)
@@ -111,7 +97,7 @@ namespace Bloomn
             State = state;
             return this;
         }
-        
+
         public IBloomFilter<TKey> Build()
         {
             var id = State?.Parameters?.Id ?? Guid.NewGuid().ToString();
@@ -120,7 +106,7 @@ namespace Bloomn
             {
                 Dimensions = Options.GetDimensions(),
                 Scaling = Options.Scaling,
-                HashAlgorithm = Options.GetHasher().Algorithm,
+                HashAlgorithm = Options.GetHasher().Algorithm
             };
 
             var state = State;
@@ -138,7 +124,7 @@ namespace Bloomn
                             state = null;
                         }
 
-                        throw new InvalidOperationException($"When state containing parameters are provided it must be consistent with the configured parameters. " +
+                        throw new InvalidOperationException("When state containing parameters are provided it must be consistent with the configured parameters. " +
                                                             $"Configured parameters: {configuredParameters}; " +
                                                             $"Parameters from state: {parametersFromState}; " +
                                                             $"Inconsistencies: {string.Join(", ", inconsistencies)}");
@@ -148,7 +134,7 @@ namespace Bloomn
 
             if (state == null)
             {
-                state = new BloomFilterState()
+                state = new BloomFilterState
                 {
                     Parameters = configuredParameters
                 };
@@ -164,7 +150,23 @@ namespace Bloomn
                 return new ScalingBloomFilter<TKey>(Options, state);
             }
 
-            return new ClassicBloomFilter<TKey>(Options, state);
+            return new FixedSizeBloomFilter<TKey>(Options, state);
+        }
+
+        public IBloomFilterBuilder<TKey> WithState(string? serializedState)
+        {
+            if (serializedState == null)
+            {
+                return this;
+            }
+
+            var state = JsonSerializer.Deserialize<BloomFilterState>(serializedState);
+            if (state == null)
+            {
+                throw new ArgumentException("Serialized state deserialized to null.", nameof(serializedState));
+            }
+
+            return WithState(state);
         }
     }
 }

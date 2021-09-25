@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using FluentAssertions;
 using MathNet.Numerics.Statistics;
-using Microsoft.VisualBasic;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,7 +12,36 @@ namespace Bloomn.Tests
 {
     public abstract class BloomFilterTestsBase
     {
+        private const bool AddLoggingCallbacks = false;
         public readonly ITestOutputHelper TestOutputHelper;
+
+        protected BloomFilterTestsBase(ITestOutputHelper testOutputHelper)
+        {
+            TestOutputHelper = testOutputHelper;
+
+
+            Options = new BloomFilterOptions<string>
+            {
+                Callbacks = AddLoggingCallbacks
+                    ? new Callbacks
+                    {
+                        OnCapacityChanged = (x, i) => testOutputHelper.WriteLine($"OnCapacityChanged({x}, {i})"),
+                        OnCountChanged = (x, i) => testOutputHelper.WriteLine($"OnCountChanged({x}, {i})"),
+                        OnBitCountChanged = (x, i) => testOutputHelper.WriteLine($"OnBitCountChanged({x}, {i})"),
+                        OnScaled = (x, p) => testOutputHelper.WriteLine($"OnScaled({x}, {p})"),
+                        OnHit = x => testOutputHelper.WriteLine($"OnHit({x})"),
+                        OnMiss = x => testOutputHelper.WriteLine($"OnMiss({x})"),
+                        OnFalsePositive = x => testOutputHelper.WriteLine($"OnFalsePositive({x})")
+                    }
+                    : new Callbacks
+                    {
+                        // OnHit = (x) => testOutputHelper.WriteLine($"OnHit({x})"),
+                        OnScaled = (x, p) => testOutputHelper.WriteLine($"OnScaled({x}, {p})")
+                    }
+            };
+        }
+
+        public BloomFilterOptions<string> Options { get; set; }
 
         protected static IEnumerable<string> PredictableStrings(int count)
         {
@@ -35,36 +61,6 @@ namespace Bloomn.Tests
 
         public void TearDown()
         {
-        }
-
-        public BloomFilterOptions<string> Options { get; set; }
-
-        private const bool AddLoggingCallbacks = false;
-
-        protected BloomFilterTestsBase(ITestOutputHelper testOutputHelper)
-        {
-            TestOutputHelper = testOutputHelper;
-
-
-            Options = new BloomFilterOptions<string>()
-            {
-                Callbacks = AddLoggingCallbacks
-                    ? new Callbacks
-                    {
-                        OnCapacityChanged = (x, i) => testOutputHelper.WriteLine($"OnCapacityChanged({x}, {i})"),
-                        OnCountChanged = (x, i) => testOutputHelper.WriteLine($"OnCountChanged({x}, {i})"),
-                        OnBitCountChanged = (x, i) => testOutputHelper.WriteLine($"OnBitCountChanged({x}, {i})"),
-                        OnScaled = (x, p) => testOutputHelper.WriteLine($"OnScaled({x}, {p})"),
-                        OnHit = (x) => testOutputHelper.WriteLine($"OnHit({x})"),
-                        OnMiss = (x) => testOutputHelper.WriteLine($"OnMiss({x})"),
-                        OnFalsePositive = (x) => testOutputHelper.WriteLine($"OnFalsePositive({x})"),
-                    }
-                    : new Callbacks()
-                    {
-                        // OnHit = (x) => testOutputHelper.WriteLine($"OnHit({x})"),
-                        OnScaled = (x, p) => testOutputHelper.WriteLine($"OnScaled({x}, {p})"),
-                    }
-            };
         }
 
         public abstract IBloomFilter<string> Create(BloomFilterOptions<string> options, BloomFilterParameters parameters);
@@ -98,8 +94,8 @@ namespace Bloomn.Tests
         }
 
         /// <summary>
-        /// These tests are intended to be more debuggable and to provide a baseline for correct behavior.
-        /// They use the same set of keys on every run and log events.
+        ///     These tests are intended to be more debuggable and to provide a baseline for correct behavior.
+        ///     They use the same set of keys on every run and log events.
         /// </summary>
         /// <param name="count"></param>
         /// <param name="capacity"></param>
@@ -147,18 +143,16 @@ namespace Bloomn.Tests
             var keys = RandomStrings(sampleSize).ToList();
             var falsePositiveCount = 0;
             foreach (var sampleKey in keys)
-            {
                 if (!bloomFilter.IsNotPresent(sampleKey))
                 {
                     falsePositiveCount++;
                 }
-            }
 
             var fpr = falsePositiveCount / (double) sampleSize;
             return fpr;
         }
-        
-        
+
+
         public void ChartFalsePositiveRates(BloomFilterParameters parameters, Func<IBloomFilter<string>> factory, Func<int, IEnumerable<string>> keyFactory, int numberToInsert, int sampleSize, int sampleInterval)
         {
             var incrementalFalsePositiveCounts = new Dictionary<int, int>();
@@ -167,10 +161,10 @@ namespace Bloomn.Tests
 
             var magnitude = (int) Math.Log10(numberToInsert);
 
-                    var sampleKeys = keyFactory(sampleSize).ToList();
+            var sampleKeys = keyFactory(sampleSize).ToList();
 
             var keys = keyFactory(numberToInsert).ToList();
-            for (int i = 0; i < keys.Count; i++)
+            for (var i = 0; i < keys.Count; i++)
             {
                 var key = keys[i];
                 sut.Add(key);
@@ -179,12 +173,10 @@ namespace Bloomn.Tests
                 {
                     var falsePositiveCount = 0;
                     foreach (var sampleKey in sampleKeys)
-                    {
                         if (!sut.IsNotPresent(sampleKey))
                         {
                             falsePositiveCount++;
                         }
-                    }
 
                     var fpr = falsePositiveCount / (double) sampleSize;
                     incrementalFalsePositiveCounts[i] = falsePositiveCount;
@@ -192,37 +184,34 @@ namespace Bloomn.Tests
                 }
             }
 
-            for (int i = 0; i < 100; i++)
+            for (var i = 0; i < 100; i++)
             {
                 var keySample = keyFactory(sampleSize).ToList();
                 var falsePositiveCount = 0;
                 foreach (var sampleKey in keySample)
-                {
                     if (!sut.IsNotPresent(sampleKey))
                     {
                         falsePositiveCount++;
                     }
-                }
+
                 maxCapacityFalsePositiveCounts.Add(falsePositiveCount);
             }
 
-            
+
             var averageIncrementalFpr = incrementalFalsePositiveCounts.Values.Select(x => x / (double) sampleSize).Average();
             TestOutputHelper.WriteLine($"Average false positive rate while adding: {averageIncrementalFpr} (expected < {parameters.Dimensions.FalsePositiveProbability})");
 
             var averageMaxedFpr = maxCapacityFalsePositiveCounts.Select(x => x / (double) sampleSize).Average();
             TestOutputHelper.WriteLine($"Average false positive rate while at max capacity: {averageMaxedFpr} (expected < {parameters.Dimensions.FalsePositiveProbability})");
-            
+
             averageIncrementalFpr.Should().BeLessOrEqualTo(parameters.Dimensions.FalsePositiveProbability);
             var maxAcceptableErrorRate = parameters.Dimensions.FalsePositiveProbability + parameters.Dimensions.FalsePositiveProbability / 10;
-            averageMaxedFpr.Should().BeLessThan(maxAcceptableErrorRate, $"the false positive rate should be close to or less than the max acceptable rate {parameters.Dimensions.FalsePositiveProbability}" );
-            
-            
+            averageMaxedFpr.Should().BeLessThan(maxAcceptableErrorRate, $"the false positive rate should be close to or less than the max acceptable rate {parameters.Dimensions.FalsePositiveProbability}");
         }
 
         /// <summary>
-        /// These tests focus on performance and statistical correctness. They use random values on each run
-        /// and run many reps of the same parameters to build a statistical picture of the behavior of the implementation.
+        ///     These tests focus on performance and statistical correctness. They use random values on each run
+        ///     and run many reps of the same parameters to build a statistical picture of the behavior of the implementation.
         /// </summary>
         /// <param name="reps"></param>
         /// <param name="count"></param>
@@ -249,7 +238,7 @@ namespace Bloomn.Tests
 
         public void VerifyContracts(BloomFilterParameters parameters, Func<IBloomFilter<string>> factory, Func<int, IEnumerable<string>> keyFactory, int reps, int sampleSize, int threads)
         {
-            var minimumCapacityForErrorRate = (1d / parameters.Dimensions.FalsePositiveProbability) * 10;
+            var minimumCapacityForErrorRate = 1d / parameters.Dimensions.FalsePositiveProbability * 10;
             var logOfMinimimuCapacity = Math.Ceiling(Math.Log10(minimumCapacityForErrorRate));
             var logOfCapacity = Math.Ceiling(Math.Log10(sampleSize));
             logOfMinimimuCapacity.Should().BeLessThan(logOfCapacity, "you can't get meaningful stats if the inverse of the error rate is within an order of magnitude of the sample size");
@@ -265,14 +254,14 @@ namespace Bloomn.Tests
             TestOutputHelper.WriteLine($"Warmup run completed in {timer.Elapsed.TotalMilliseconds}ms, with {warmupResult} false positives for an error rate of: {warmupResult / (double) sampleSize}");
 
 
-            for (int i = 0; i < reps; i++)
+            for (var i = 0; i < reps; i++)
             {
                 timer.Restart();
                 var falsePositiveCount = GetFalsePositiveCount();
                 timer.Stop();
                 times.Add(timer.Elapsed.TotalMilliseconds);
 
-                var falsePositiveRate = (double) falsePositiveCount / (double) sampleSize;
+                var falsePositiveRate = falsePositiveCount / (double) sampleSize;
                 falsePositiveRates.Add(falsePositiveRate);
             }
 
@@ -282,13 +271,13 @@ namespace Bloomn.Tests
             TestOutputHelper.WriteLine($"Expected error rate: {parameters.Dimensions.FalsePositiveProbability}");
             TestOutputHelper.WriteLine($"Reps: {reps}");
             TestOutputHelper.WriteLine($"Sample size: {sampleSize}");
-            TestOutputHelper.WriteLine($"Observed error rate stats:");
+            TestOutputHelper.WriteLine("Observed error rate stats:");
             TestOutputHelper.WriteLine($"  Mean: {falsePositiveStats.Mean}");
             TestOutputHelper.WriteLine($"  Min: {falsePositiveStats.Minimum}");
             TestOutputHelper.WriteLine($"  Max: {falsePositiveStats.Maximum}");
             TestOutputHelper.WriteLine($"  σ: {falsePositiveStats.StandardDeviation}");
 
-            TestOutputHelper.WriteLine($"Duration stats:");
+            TestOutputHelper.WriteLine("Duration stats:");
             TestOutputHelper.WriteLine($"  Mean: {timeStats.Mean}ms");
             TestOutputHelper.WriteLine($"  Min: {timeStats.Minimum}ms");
             TestOutputHelper.WriteLine($"  Max: {timeStats.Maximum}ms");
@@ -328,7 +317,6 @@ namespace Bloomn.Tests
                 return falsePositiveCount;
             }
         }
-
 
 
         // [Fact]

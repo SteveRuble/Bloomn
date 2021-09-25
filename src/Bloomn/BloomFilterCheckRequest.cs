@@ -12,7 +12,10 @@ namespace Bloomn
             Bytes = MemoryMarshal.AsBytes(key.AsSpan());
         }
 
-        public static implicit operator BloomFilterKey(string s) => new BloomFilterKey(s);
+        public static implicit operator BloomFilterKey(string s)
+        {
+            return new(s);
+        }
     }
 
     public enum BloomFilterCheckBehavior
@@ -21,16 +24,27 @@ namespace Bloomn
         PrepareForAdd,
         AddImmediately
     }
-    
+
     public readonly ref struct BloomFilterCheckRequest<T>
     {
         public readonly T Key;
         public readonly BloomFilterCheckBehavior Behavior;
 
-        public static BloomFilterCheckRequest<T> CheckOnly(T key) => new BloomFilterCheckRequest<T>(key, BloomFilterCheckBehavior.CheckOnly);
-        public static BloomFilterCheckRequest<T> PrepareForAdd(T key) => new BloomFilterCheckRequest<T>(key, BloomFilterCheckBehavior.PrepareForAdd);
-        public static BloomFilterCheckRequest<T> AddImmediately(T key) => new BloomFilterCheckRequest<T>(key, BloomFilterCheckBehavior.AddImmediately);
-        
+        public static BloomFilterCheckRequest<T> CheckOnly(T key)
+        {
+            return new(key, BloomFilterCheckBehavior.CheckOnly);
+        }
+
+        public static BloomFilterCheckRequest<T> PrepareForAdd(T key)
+        {
+            return new(key, BloomFilterCheckBehavior.PrepareForAdd);
+        }
+
+        public static BloomFilterCheckRequest<T> AddImmediately(T key)
+        {
+            return new(key, BloomFilterCheckBehavior.AddImmediately);
+        }
+
         public BloomFilterCheckRequest(T key, BloomFilterCheckBehavior behavior)
         {
             Key = key;

@@ -3,39 +3,40 @@ using System.Runtime.InteropServices;
 
 namespace Bloomn
 {
-    public class Murmur3HasherFactory : 
+    public class Murmur3HasherFactory :
         IKeyHasherFactory<string>,
         IKeyHasherFactory<byte[]>
     {
-        public string Algorithm => "murmur3";
-        public Func<string, uint> CreateHasher(int seed, int modulus)
-        {
-            var useed = (uint) seed;
-
-            return (key) =>
-            {
-                var bytes = MemoryMarshal.AsBytes(key.AsSpan());
-                var h = Compute(bytes, (uint) bytes.Length, useed);
-                return (uint) (h % modulus);
-            };
-        }     
-        
         Func<byte[], uint> IKeyHasherFactory<byte[]>.CreateHasher(int seed, int modulus)
         {
             var useed = (uint) seed;
 
-            return (key) =>
+            return key =>
             {
                 var h = Compute(key, (uint) key.Length, useed);
                 return (uint) (h % modulus);
             };
         }
 
+        public string Algorithm => "murmur3";
+
+        public Func<string, uint> CreateHasher(int seed, int modulus)
+        {
+            var useed = (uint) seed;
+
+            return key =>
+            {
+                var bytes = MemoryMarshal.AsBytes(key.AsSpan());
+                var h = Compute(bytes, (uint) bytes.Length, useed);
+                return (uint) (h % modulus);
+            };
+        }
+
         public static uint Compute(ReadOnlySpan<byte> data, uint length, uint seed)
         {
-            uint nblocks = length >> 2;
+            var nblocks = length >> 2;
 
-            uint h1 = seed;
+            var h1 = seed;
 
             const uint c1 = 0xcc9e2d51;
             const uint c2 = 0x1b873593;
@@ -43,11 +44,11 @@ namespace Bloomn
             //----------
             // body
 
-            int i = 0 ;
+            var i = 0;
 
-            for (uint j = nblocks; j > 0 ; --j)
+            for (var j = nblocks; j > 0; --j)
             {
-                uint k1l = BitConverter.ToUInt32(data[i..]);
+                var k1l = BitConverter.ToUInt32(data[i..]);
 
                 k1l *= c1;
                 k1l = Rotl32(k1l, 15);
@@ -57,7 +58,7 @@ namespace Bloomn
                 h1 = Rotl32(h1, 13);
                 h1 = h1 * 5 + 0xe6546b64;
 
-                i+=4;
+                i += 4;
             }
 
             //----------
@@ -67,16 +68,25 @@ namespace Bloomn
 
             uint k1 = 0;
 
-            uint tailLength = length & 3;
+            var tailLength = length & 3;
 
             if (tailLength == 3)
-                k1 ^= (uint)data[2 + (int)nblocks] << 16;
+            {
+                k1 ^= (uint) data[2 + (int) nblocks] << 16;
+            }
+
             if (tailLength >= 2)
-                k1 ^= (uint)data[1 + (int)nblocks] << 8;
+            {
+                k1 ^= (uint) data[1 + (int) nblocks] << 8;
+            }
+
             if (tailLength >= 1)
             {
-                k1 ^= data[(int)nblocks];
-                k1 *= c1; k1 = Rotl32(k1, 15); k1 *= c2; h1 ^= k1;
+                k1 ^= data[(int) nblocks];
+                k1 *= c1;
+                k1 = Rotl32(k1, 15);
+                k1 *= c2;
+                h1 ^= k1;
             }
 
             //----------
@@ -104,6 +114,5 @@ namespace Bloomn
         {
             return (x << r) | (x >> (32 - r));
         }
-
     }
 }

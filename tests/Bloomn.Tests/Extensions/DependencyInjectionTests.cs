@@ -46,9 +46,9 @@ namespace Bloomn.Tests.Extensions
         public void CanConfigureAndResolveDefaultBuilderUsingConfiguration()
         {
             var configBuilder = new ConfigurationBuilder();
-            configBuilder.Add(new MemoryConfigurationSource()
+            configBuilder.Add(new MemoryConfigurationSource
             {
-                InitialData = new Dictionary<string, string>()
+                InitialData = new Dictionary<string, string>
                 {
                     ["Dimensions:Capacity"] = "1234",
                     ["Dimensions:FalsePositiveProbability"] = "0.0123",
@@ -79,9 +79,9 @@ namespace Bloomn.Tests.Extensions
         public void WhenProvidedConfigurationIsInvalidThenAnErrorIsThrown()
         {
             var configBuilder = new ConfigurationBuilder();
-            configBuilder.Add(new MemoryConfigurationSource()
+            configBuilder.Add(new MemoryConfigurationSource
             {
-                InitialData = new Dictionary<string, string>()
+                InitialData = new Dictionary<string, string>
                 {
                     ["Dimensions:Capacity"] = "1234",
                     ["Scaling:MaxCapacityBehavior"] = "Scale",
