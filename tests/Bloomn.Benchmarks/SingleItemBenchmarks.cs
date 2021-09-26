@@ -12,7 +12,7 @@ namespace Bloomn.Benchmarks
     [MemoryDiagnoser]
     public class SingleItemBenchmarks
     {
-        public const int OperationsPerInvoke = 100;
+        public const int OperationsPerInvoke = 1000;
 
         public int KeyIndex { get; set; }
         public readonly IBloomFilter<int> Fixed;

@@ -1,4 +1,4 @@
-#Bloomn Bloom Filter for .NET
+# Bloomn Bloom Filter for .NET
 
 Bloomn provides a modern, high performance bloom filter implementation.
 
@@ -12,4 +12,9 @@ Bloomn provides a modern, high performance bloom filter implementation.
 
 ## Examples
 
+See [tests/Bloomn.Tests/Examples](tests/Bloomn.Tests/Examples)
 
+### Using Service Provider
+```c#
+
+```
