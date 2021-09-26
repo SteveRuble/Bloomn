@@ -34,7 +34,7 @@ namespace Bloomn.Tests
 
             var state = actual.GetState();
             state.Parameters.ShouldNotBeNull();
-            state.Parameters.HashAlgorithm.Should().Be(new Murmur3HasherFactory().Algorithm);
+            state.Parameters.HashAlgorithm.Should().Be(new DefaultHasherFactoryV1().Algorithm);
         }
     }
 }

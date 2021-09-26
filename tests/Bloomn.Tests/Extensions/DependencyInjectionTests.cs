@@ -30,7 +30,7 @@ namespace Bloomn.Tests.Extensions
         public void CanConfigureAndResolveDefaultBuilder()
         {
             var svc = new ServiceCollection()
-                .AddBloomFilters<string>(x => x.WithDefaultProfile(b => b.WithCapacityAndErrorRate(1234, 0.0123)))
+                .AddBloomFilters<string>(x => x.WithDefaultProfile(b => b.WithCapacityAndFalsePositiveProbability(1234, 0.0123)))
                 .BuildServiceProvider();
 
             var builder = svc.GetRequiredService<IBloomFilterBuilder<string>>();
@@ -103,8 +103,8 @@ namespace Bloomn.Tests.Extensions
         public void CanConfigureAndResolveDefaultBuilderUsingCustomProfile()
         {
             var svc = new ServiceCollection()
-                .AddBloomFilters<string>(x => x.WithDefaultProfile(b => b.WithCapacityAndErrorRate(1234, 0.0123))
-                    .WithProfile("custom", b => b.WithCapacityAndErrorRate(4321, 0.0321)))
+                .AddBloomFilters<string>(x => x.WithDefaultProfile(b => b.WithCapacityAndFalsePositiveProbability(1234, 0.0123))
+                    .WithProfile("custom", b => b.WithCapacityAndFalsePositiveProbability(4321, 0.0321)))
                 .BuildServiceProvider();
 
             var builder = svc.GetRequiredService<IBloomFilterBuilder<string>>();

@@ -22,8 +22,8 @@ namespace Bloomn.Tests
 
             Options = new BloomFilterOptions<string>
             {
-                Callbacks = AddLoggingCallbacks
-                    ? new Callbacks
+                Events = AddLoggingCallbacks
+                    ? new BloomFilterEvents
                     {
                         OnCapacityChanged = (x, i) => testOutputHelper.WriteLine($"OnCapacityChanged({x}, {i})"),
                         OnCountChanged = (x, i) => testOutputHelper.WriteLine($"OnCountChanged({x}, {i})"),
@@ -33,7 +33,7 @@ namespace Bloomn.Tests
                         OnMiss = x => testOutputHelper.WriteLine($"OnMiss({x})"),
                         OnFalsePositive = x => testOutputHelper.WriteLine($"OnFalsePositive({x})")
                     }
-                    : new Callbacks
+                    : new BloomFilterEvents
                     {
                         // OnHit = (x) => testOutputHelper.WriteLine($"OnHit({x})"),
                         OnScaled = (x, p) => testOutputHelper.WriteLine($"OnScaled({x}, {p})")
@@ -81,15 +81,18 @@ namespace Bloomn.Tests
         {
             var sut = Create(Options, new BloomFilterParameters("test").WithCapacityAndErrorRate(100, 0.1));
 
-            var key = "test string";
-            using (var entry = sut.CheckAndPrepareAdd(key))
+            for (int i = 0; i < 10; i++)
             {
-                entry.IsNotPresent.Should().BeTrue("the key has not been added");
-                sut.IsNotPresent(key).Should().BeTrue("the key has not been added");
+                var key = Guid.NewGuid().ToString();
+                using (var entry = sut.CheckAndPrepareAdd(key))
+                {
+                    entry.IsNotPresent.Should().BeTrue("the key has not been added");
+                    sut.IsNotPresent(key).Should().BeTrue("the key has not been added");
 
-                entry.Add().Should().BeTrue("the key had not been added previously");
+                    entry.Add().Should().BeTrue("the key had not been added previously");
 
-                sut.IsNotPresent(key).Should().BeFalse("the key has been added");
+                    sut.IsNotPresent(key).Should().BeFalse("the key has been added");
+                }
             }
         }
 
@@ -299,21 +302,21 @@ namespace Bloomn.Tests
                 var falsePositiveCount = 0;
                 var count = 0;
                 keyFactory(sampleSize).AsParallel()
-                    .WithDegreeOfParallelism(threads)
-                    .ForAll(s =>
-                    {
-                        var c = Interlocked.Increment(ref count);
-                        var f = falsePositiveCount;
-                        if (!sut.IsNotPresent(s))
-                        {
-                            f = Interlocked.Increment(ref falsePositiveCount);
-                            var runningFpr = f / (double) c;
-                            // _testOutputHelper.WriteLine($"False positive rate @ {c}: {runningFpr}");
-                        }
+                                      .WithDegreeOfParallelism(threads)
+                                      .ForAll(s =>
+                                      {
+                                          var c = Interlocked.Increment(ref count);
+                                          var f = falsePositiveCount;
+                                          if (!sut.IsNotPresent(s))
+                                          {
+                                              f = Interlocked.Increment(ref falsePositiveCount);
+                                              var runningFpr = f / (double) c;
+                                              // _testOutputHelper.WriteLine($"False positive rate @ {c}: {runningFpr}");
+                                          }
 
 
-                        sut.Add(s);
-                    });
+                                          sut.Add(s);
+                                      });
                 return falsePositiveCount;
             }
         }

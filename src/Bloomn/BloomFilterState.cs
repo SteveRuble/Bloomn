@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -80,8 +82,12 @@ namespace Bloomn
                             result.BitArrays = new List<byte[]>();
                             for (; reader.TokenType != JsonTokenType.EndArray; reader.Read())
                             {
-                                var bits = reader.GetBytesFromBase64();
-                                result.BitArrays.Add(bits);
+                                var compressedBits = reader.GetBytesFromBase64();
+                                using var compressedStream = new MemoryStream(compressedBits);
+                                using var gz = new DeflateStream(compressedStream, CompressionMode.Decompress);
+                                using var bitStream = new MemoryStream();
+                                gz.CopyTo(bitStream);
+                                result.BitArrays.Add(bitStream.ToArray());
                             }
 
                             break;
@@ -107,9 +113,17 @@ namespace Bloomn
                 if (value.BitArrays != null && value.BitArrays.Any())
                 {
                     writer.WritePropertyName("bits");
-                    writer.WriteStartArray();
-                    foreach (var bitArray in value.BitArrays) writer.WriteBase64StringValue(bitArray);
 
+                    writer.WriteStartArray();
+                    foreach (var bitArray in value.BitArrays)
+                    {
+                        using var m = new MemoryStream();
+                        using var gz = new DeflateStream(m, CompressionLevel.Optimal);
+                        gz.Write(bitArray);
+                        gz.Flush();
+                        var compressedBits = m.ToArray();
+                        writer.WriteBase64StringValue(compressedBits);
+                    }
                     writer.WriteEndArray();
                 }
 

@@ -2,9 +2,14 @@
 
 Bloomn provides a modern, high performance bloom filter implementation.
 
-### Features
+## Features
 
 - Provides a very low allocation API for demanding scenarios
 - Provides a simpler API for simpler scenarios
 - Bloom filter state can be exported, serialized, and imported
-- Integrates with standard .NET dependency injection framework.
+- Integrates with standard .NET dependency injection framework
+
+
+## Examples
+
+

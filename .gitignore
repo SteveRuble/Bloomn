@@ -43,3 +43,6 @@ coverage.json
 
 # Snapshotter mismatches
 **/__mismatch__/
+
+# Benchmark results
+tests/Bloomn.Benchmarks/BenchmarkDotNet.Artifacts

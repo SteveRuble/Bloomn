@@ -5,28 +5,14 @@ using Microsoft.Extensions.Options;
 
 namespace Bloomn
 {
-    public interface IBloomFilterOptionsBuilder<TKey>
+    internal class BloomFilterBuilder<TKey> : IBloomFilterBuilder<TKey>, IBloomFilterOptionsBuilder<TKey>
     {
-        IBloomFilterBuilder<TKey> WithCapacityAndErrorRate(int capacity, double errorRate);
-        IBloomFilterBuilder<TKey> WithDimensions(BloomFilterDimensions dimensions);
-        IBloomFilterBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8);
-        IBloomFilterBuilder<TKey> WithHasher(IKeyHasherFactory<TKey> hasherFactory);
-    }
-
-    public interface IBloomFilterBuilder<TKey> : IBloomFilterOptionsBuilder<TKey>
-    {
-        IBloomFilterBuilder<TKey> WithOptions(BloomFilterOptions<TKey> options);
-        IBloomFilterBuilder<TKey> WithProfile(string profile);
-        IBloomFilterBuilder<TKey> WithState(BloomFilterState state);
-        IBloomFilter<TKey> Build();
-    }
-
-    internal class BloomFilterBuilder<TKey> : IBloomFilterBuilder<TKey>
-    {
+        private bool _validateStateAgainstOptions;
         private readonly IOptionsSnapshot<BloomFilterOptions<TKey>>? _optionsSnapshot;
 
         public BloomFilterBuilder(IOptionsSnapshot<BloomFilterOptions<TKey>> options)
         {
+            _validateStateAgainstOptions = true;
             _optionsSnapshot = options;
             Options = options.Value;
         }
@@ -40,13 +26,15 @@ namespace Bloomn
 
         internal BloomFilterState? State { get; set; }
 
-        public IBloomFilterBuilder<TKey> WithCapacityAndErrorRate(int capacity, double errorRate)
+        IBloomFilterOptionsBuilder<TKey> IBloomFilterOptionsBuilder<TKey>.WithCapacityAndFalsePositiveProbability(int capacity, double falsePositiveProbability)
         {
-            return WithDimensions(BloomFilterDimensions.ForCapacityAndErrorRate(capacity, errorRate));
+            _validateStateAgainstOptions = true;
+            return WithDimensions(BloomFilterDimensions.ForCapacityAndErrorRate(capacity, falsePositiveProbability));
         }
 
-        public IBloomFilterBuilder<TKey> WithDimensions(BloomFilterDimensions dimensions)
+        public IBloomFilterOptionsBuilder<TKey> WithDimensions(BloomFilterDimensions dimensions)
         {
+            _validateStateAgainstOptions = true;
             Options.Dimensions = new BloomFilterDimensionsBuilder
             {
                 FalsePositiveProbability = dimensions.FalsePositiveProbability,
@@ -58,8 +46,9 @@ namespace Bloomn
             return this;
         }
 
-        public IBloomFilterBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8)
+        public IBloomFilterOptionsBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8)
         {
+            _validateStateAgainstOptions = true;
             Options.Scaling = new BloomFilterScaling
             {
                 MaxCapacityBehavior = MaxCapacityBehavior.Scale,
@@ -69,23 +58,47 @@ namespace Bloomn
             return this;
         }
 
-        public IBloomFilterBuilder<TKey> WithHasher(IKeyHasherFactory<TKey> hasherFactory)
+        public IBloomFilterOptionsBuilder<TKey> WithHasher(IKeyHasherFactory<TKey> hasherFactory)
         {
+            _validateStateAgainstOptions = true;
             Options.SetHasher(hasherFactory);
             return this;
         }
 
         public IBloomFilterBuilder<TKey> WithOptions(BloomFilterOptions<TKey> options)
         {
+            _validateStateAgainstOptions = true;
             Options = options;
+            return this;
+        }
+
+        public IBloomFilterBuilder<TKey> WithOptions(Action<IBloomFilterOptionsBuilder<TKey>> configure)
+        {
+            _validateStateAgainstOptions = true;
+            configure(this);
+            return this;
+        }
+
+        public IBloomFilterOptionsBuilder<TKey> WithCallbacks(BloomFilterEvents events)
+        {
+            _validateStateAgainstOptions = true;
+            Options.Events = events;
+            return this;
+        }
+
+        public IBloomFilterOptionsBuilder<TKey> IgnoreCapacityLimits()
+        {
+            _validateStateAgainstOptions = true;
+            Options.Scaling = Options.Scaling with {MaxCapacityBehavior = MaxCapacityBehavior.Ignore};
             return this;
         }
 
         public IBloomFilterBuilder<TKey> WithProfile(string profile)
         {
+            _validateStateAgainstOptions = true;
             if (_optionsSnapshot == null)
             {
-                throw new InvalidOperationException("This builder was not ");
+                throw new BloomFilterException(BloomFilterExceptionCode.InvalidOptions, "This builder was not acquired from a service provider that could inject options.");
             }
 
             Options = _optionsSnapshot.Get(profile);
@@ -106,11 +119,11 @@ namespace Bloomn
             {
                 Dimensions = Options.GetDimensions(),
                 Scaling = Options.Scaling,
-                HashAlgorithm = Options.GetHasher().Algorithm
+                HashAlgorithm = Options.GetHasherFactory().Algorithm
             };
 
             var state = State;
-            if (state != null)
+            if (state != null && _validateStateAgainstOptions)
             {
                 var parametersFromState = state?.Parameters;
 

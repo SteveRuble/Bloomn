@@ -5,6 +5,8 @@ using Xunit.Abstractions;
 
 namespace Bloomn.Tests
 {
+    public class TestWithOutput {}
+    
     public class PerformanceExperiments
     {
         private readonly ITestOutputHelper _testOutputHelper;

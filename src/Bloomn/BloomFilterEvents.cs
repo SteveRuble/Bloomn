@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Bloomn
 {
-    public class Callbacks
+    public class BloomFilterEvents
     {
         public Action<string, int>? OnCapacityChanged { get; set; }
         public Action<string, long>? OnCountChanged { get; set; }
@@ -16,13 +16,13 @@ namespace Bloomn
 
     internal class StateMetrics : IBloomFilterDimensions
     {
-        private readonly Callbacks _callbacks;
+        private readonly BloomFilterEvents _bloomFilterEvents;
         private long _count;
         private int _setBitCount;
 
-        public StateMetrics(BloomFilterParameters parameters, Callbacks callbacks)
+        public StateMetrics(BloomFilterParameters parameters, BloomFilterEvents bloomFilterEvents)
         {
-            _callbacks = callbacks;
+            _bloomFilterEvents = bloomFilterEvents;
             Id = parameters.Id;
             FalsePositiveProbability = parameters.Dimensions.FalsePositiveProbability;
             Capacity = parameters.Dimensions.Capacity;
@@ -43,13 +43,13 @@ namespace Bloomn
         public void OnCapacityChanged(int value)
         {
             Capacity = value;
-            _callbacks.OnCapacityChanged?.Invoke(Id, value);
+            _bloomFilterEvents.OnCapacityChanged?.Invoke(Id, value);
         }
 
         public void IncrementCount(long amount)
         {
             var value = Interlocked.Add(ref _count, amount);
-            _callbacks.OnCountChanged?.Invoke(Id, value);
+            _bloomFilterEvents.OnCountChanged?.Invoke(Id, value);
         }
 
         public void IncrementSetBitCount(int amount)
@@ -60,33 +60,33 @@ namespace Bloomn
         public void OnCountChanged(long value)
         {
             _count = value;
-            _callbacks.OnCountChanged?.Invoke(Id, _count);
+            _bloomFilterEvents.OnCountChanged?.Invoke(Id, _count);
         }
 
         public void OnBitCountChanged(int value)
         {
             BitCount = value;
-            _callbacks.OnBitCountChanged?.Invoke(Id, value);
+            _bloomFilterEvents.OnBitCountChanged?.Invoke(Id, value);
         }
 
         public void OnScaled(BloomFilterParameters parameters)
         {
-            _callbacks.OnScaled?.Invoke(Id, parameters);
+            _bloomFilterEvents.OnScaled?.Invoke(Id, parameters);
         }
 
         public void OnHit()
         {
-            _callbacks.OnHit?.Invoke(Id);
+            _bloomFilterEvents.OnHit?.Invoke(Id);
         }
 
         public void OnMiss()
         {
-            _callbacks.OnMiss?.Invoke(Id);
+            _bloomFilterEvents.OnMiss?.Invoke(Id);
         }
 
         public void OnFalsePositive()
         {
-            _callbacks.OnFalsePositive?.Invoke(Id);
+            _bloomFilterEvents.OnFalsePositive?.Invoke(Id);
         }
     }
 }

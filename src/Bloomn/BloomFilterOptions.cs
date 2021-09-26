@@ -1,10 +1,12 @@
 using System;
+using System.Buffers;
 
 namespace Bloomn
 {
     public class BloomFilterOptions<T>
     {
-        public static string DefaultHasherType = typeof(Murmur3HasherFactory).AssemblyQualifiedName!;
+        public static string DefaultHasherType = typeof(DefaultHasherFactoryV1).AssemblyQualifiedName!;
+       
         private IKeyHasherFactory<T>? _keyHasher;
 
         public static BloomFilterOptions<T> DefaultOptions { get; set; } = new();
@@ -15,7 +17,7 @@ namespace Bloomn
 
         public BloomFilterScaling Scaling { get; set; } = new();
 
-        public Callbacks Callbacks { get; set; } = new();
+        public BloomFilterEvents Events { get; set; } = new();
 
         public bool DiscardInconsistentState { get; set; }
 
@@ -30,7 +32,7 @@ namespace Bloomn
             return Dimensions?.Build() ?? new BloomFilterDimensions();
         }
 
-        public IKeyHasherFactory<T> GetHasher()
+        public IKeyHasherFactory<T> GetHasherFactory()
         {
             if (_keyHasher == null)
             {
@@ -42,8 +44,8 @@ namespace Bloomn
                 {
                     if (HasherType == DefaultHasherType)
                     {
-                        throw new BloomFilterException(BloomFilterExceptionCode.InvalidOptions, "The default hasher can handle keys of type string and byte[]. If you " +
-                                                                                                $"need to support keys of type {typeof(T)} you will need to implement {typeof(IKeyHasherFactory<T>)} " +
+                        throw new BloomFilterException(BloomFilterExceptionCode.InvalidOptions, "The default hasher can handle keys of type string, byte[], int, long, float, double, and decimal. " +
+                                                                                                $"If you need to support keys of type {typeof(T)} you will need to implement {typeof(IKeyHasherFactory<T>)} " +
                                                                                                 "and set HasherType to the assembly-qualified name, or pass an instance to the " +
                                                                                                 "SetHasher method of the options builder.");
                     }

@@ -30,7 +30,7 @@ namespace Bloomn
 
             try
             {
-                var _ = options.GetHasher();
+                var _ = options.GetHasherFactory();
             }
             catch (Exception ex)
             {

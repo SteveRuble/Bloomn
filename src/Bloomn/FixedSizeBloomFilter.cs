@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 
@@ -15,9 +16,6 @@ namespace Bloomn
 
         private readonly int _actualBitCount;
         private readonly BitArray[] _bitArrays;
-
-        private readonly int _bitCount;
-
         private readonly int _bitsPerSlice;
         private readonly int _hashCount;
         private readonly Func<T, uint> _hasher1;
@@ -26,6 +24,10 @@ namespace Bloomn
 
         private readonly ReaderWriterLockSlim _lock = new();
         private readonly StateMetrics _metrics;
+
+        private readonly Func<PreparedAdd, bool> _applyPreparedAdd;
+        private readonly Action<PreparedAdd> _release;
+        
 
         internal MaxCapacityBehavior MaxCapacityBehavior;
 
@@ -40,9 +42,9 @@ namespace Bloomn
 
             Parameters = state.Parameters;
 
-            var hasherFactory = options.GetHasher();
+            var hasherFactory = options.GetHasherFactory();
 
-            _metrics = new StateMetrics(Parameters, options.Callbacks);
+            _metrics = new StateMetrics(Parameters, options.Events);
 
             _bitsPerSlice = ComputeBitsPerSlice(state.Parameters.Dimensions.BitCount, state.Parameters.Dimensions.HashCount);
 
@@ -60,13 +62,14 @@ namespace Bloomn
 
 
             MaxCapacityBehavior = Parameters.Scaling.MaxCapacityBehavior;
-            _bitCount = Parameters.Dimensions.BitCount;
             _hashCount = Parameters.Dimensions.HashCount;
             _actualBitCount = _bitsPerSlice * _hashCount;
             _indexPool = ArrayPool<int>.Create(_hashCount, 10);
 
             _hasher1 = hasherFactory.CreateHasher(0, _bitsPerSlice);
             _hasher2 = hasherFactory.CreateHasher(Hash2Seed, _bitsPerSlice);
+            _applyPreparedAdd = ApplyPreparedAdd;
+            _release = Release;
         }
 
 
@@ -127,31 +130,9 @@ namespace Bloomn
         internal static int ComputeBitsPerSlice(int bitCount, int hashCount)
         {
             var n = bitCount / hashCount;
+            
             // Hash distribution is best when modded by a prime number
-            if (n % 2 == 0)
-            {
-                n++;
-            }
-
-            // The maximum prime gap at 1,346,294,310,749 is 582 so we should never hit it
-            var safety = n + 582;
-            int i, j;
-            for (i = n; i < safety; i += 2)
-            {
-                var limit = Math.Sqrt(i);
-                for (j = 3; j <= limit; j += 2)
-                    if (i % j == 0)
-                    {
-                        break;
-                    }
-
-                if (j > limit)
-                {
-                    return i;
-                }
-            }
-
-            throw new Exception($"Prime above {n} not found in a reasonable time (your filter must be unreasonably large).");
+            return MathHelpers.GetNextPrimeNumber(n);
         }
 
         public bool IsNotPresent(BloomFilterCheckRequest<T> checkRequest)
@@ -197,7 +178,7 @@ namespace Bloomn
                 _lock.ExitReadLock();
             }
         }
-
+        
         private PreparedAdd PrepareAdd(BloomFilterCheckRequest<T> checkRequest)
         {
             _lock.EnterReadLock();
@@ -240,7 +221,7 @@ namespace Bloomn
                     return PreparedAdd.AlreadyAdded;
                 }
 
-                return new PreparedAdd(Id, indexes, ApplyPreparedAdd, Release);
+                return new PreparedAdd(Id, indexes, _applyPreparedAdd, _release);
             }
             finally
             {

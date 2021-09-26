@@ -93,7 +93,7 @@ namespace Bloomn.Tests
 
             var first = new ScalingBloomFilter<string>(new BloomFilterOptions<string>
             {
-                Callbacks = new Callbacks
+                Events = new BloomFilterEvents
                 {
                     OnScaled = (id, p) => TestOutputHelper.WriteLine($"{id} {p}")
                 }

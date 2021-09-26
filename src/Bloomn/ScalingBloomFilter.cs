@@ -45,7 +45,7 @@ namespace Bloomn
             Parameters = state.Parameters;
             _bloomFilterScaling = state.Parameters.Scaling;
 
-            _metrics = new StateMetrics(Parameters, options.Callbacks);
+            _metrics = new StateMetrics(Parameters, options.Events);
 
             if (state.Parameters.Id == null)
             {

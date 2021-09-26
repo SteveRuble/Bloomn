@@ -4,11 +4,11 @@ namespace Bloomn
 {
     public readonly struct PreparedAdd : IDisposable
     {
-        private readonly Func<PreparedAdd, bool>? _add;
         public readonly string FilterId;
         internal readonly int[]? Indexes;
         internal readonly Action<PreparedAdd>? Release;
         public readonly bool CanAdd;
+        private readonly Func<PreparedAdd, bool>? _add;
 
         public PreparedAdd(string filterId, int[]? indexes, Func<PreparedAdd, bool>? add, Action<PreparedAdd>? release)
         {
