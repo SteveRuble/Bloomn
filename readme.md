@@ -10,6 +10,7 @@ Bloomn provides a modern, high performance bloom filter implementation.
 - Supports scalable bloom filters for scenarios where set size is unknown.
 - Thread safe.
 - High test coverage.
+- Default key hasher handles string, byte[], and numeric types.
 
 
 ## Examples
@@ -48,12 +49,11 @@ else
 {
     // If no serialized state exists, we can build and populate the filter:
     filter = builder.Build();
-    filter.Add(2);
-    filter.Add(3);
-
-    for (var i = 3; i < 1000; i = MathHelpers.GetNextPrimeNumber(i + 1))
+    
+    // For this example, we'll populate the filter with prime numbers using some method
+    for (var prime in EnumeratePrimeNumbers(1000))
     {
-        filter.Add(i);
+        filter.Add(prime);
     }
 
     // Export the state and save it for next time:
