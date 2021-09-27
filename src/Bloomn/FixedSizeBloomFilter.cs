@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace Bloomn
 {
-    public sealed class FixedSizeBloomFilter<T> : IBloomFilter<T>
+    public sealed class FixedSizeBloomFilter<T> : IBloomFilter<T>, IPreparedAddTarget
     {
         /// <summary>
         ///     Seed used for second hash.
@@ -25,9 +25,6 @@ namespace Bloomn
         private readonly ReaderWriterLockSlim _lock = new();
         private readonly StateMetrics _metrics;
 
-        private readonly Func<PreparedAdd, bool> _applyPreparedAdd;
-        private readonly Action<PreparedAdd> _release;
-        
 
         internal MaxCapacityBehavior MaxCapacityBehavior;
 
@@ -68,8 +65,6 @@ namespace Bloomn
 
             _hasher1 = hasherFactory.CreateHasher(0, _bitsPerSlice);
             _hasher2 = hasherFactory.CreateHasher(Hash2Seed, _bitsPerSlice);
-            _applyPreparedAdd = ApplyPreparedAdd;
-            _release = Release;
         }
 
 
@@ -130,7 +125,7 @@ namespace Bloomn
         internal static int ComputeBitsPerSlice(int bitCount, int hashCount)
         {
             var n = bitCount / hashCount;
-            
+
             // Hash distribution is best when modded by a prime number
             return MathHelpers.GetNextPrimeNumber(n);
         }
@@ -178,7 +173,7 @@ namespace Bloomn
                 _lock.ExitReadLock();
             }
         }
-        
+
         private PreparedAdd PrepareAdd(BloomFilterCheckRequest<T> checkRequest)
         {
             _lock.EnterReadLock();
@@ -221,7 +216,7 @@ namespace Bloomn
                     return PreparedAdd.AlreadyAdded;
                 }
 
-                return new PreparedAdd(Id, indexes, _applyPreparedAdd, _release);
+                return new PreparedAdd(Id, indexes, this);
             }
             finally
             {
@@ -265,21 +260,19 @@ namespace Bloomn
             }
         }
 
-        public bool ApplyPreparedAdd(PreparedAdd preparedAdd)
+        public bool ApplyPreparedAdd(string id, int[] indexes)
         {
             _lock.EnterWriteLock();
             try
             {
                 ValidateCapacity();
                 var madeChange = false;
-                if (preparedAdd.Indexes != null)
+                for (var i = 0; i < _hashCount; i++)
                 {
-                    for (var i = 0; i < _hashCount; i++)
-                    {
-                        var index = preparedAdd.Indexes[i];
-                        madeChange |= !SetBitAndReturnPreviousState(i, index);
-                    }
+                    var index = indexes[i];
+                    madeChange |= !SetBitAndReturnPreviousState(i, index);
                 }
+
 
                 if (madeChange)
                 {
@@ -294,12 +287,9 @@ namespace Bloomn
             }
         }
 
-        public void Release(PreparedAdd preparedAdd)
+        public void Release(string id, int[] indexes)
         {
-            if (preparedAdd.Indexes != null)
-            {
-                _indexPool.Return(preparedAdd.Indexes);
-            }
+            _indexPool.Return(indexes);
         }
 
         private bool SetBitAndReturnPreviousState(int slice, int index)

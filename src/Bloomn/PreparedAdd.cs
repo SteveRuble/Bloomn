@@ -1,31 +1,33 @@
 using System;
+using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Bloomn
 {
     public readonly struct PreparedAdd : IDisposable
     {
+        private readonly bool _canAdd;
+        public readonly IPreparedAddTarget? AddTarget;
         public readonly string FilterId;
         internal readonly int[]? Indexes;
-        internal readonly Action<PreparedAdd>? Release;
-        public readonly bool CanAdd;
-        private readonly Func<PreparedAdd, bool>? _add;
-
-        public PreparedAdd(string filterId, int[]? indexes, Func<PreparedAdd, bool>? add, Action<PreparedAdd>? release)
+        [MemberNotNullWhen(true, nameof(Indexes))]
+        [MemberNotNullWhen(true, nameof(AddTarget))]
+        public bool CanAdd => _canAdd;
+        public PreparedAdd(string filterId, int[]? indexes, IPreparedAddTarget? addTarget)
         {
-            _add = add;
+            AddTarget = addTarget;
             FilterId = filterId;
-            Release = release;
             Indexes = indexes;
-            CanAdd = add != null && release != null && indexes != null;
+            _canAdd = AddTarget != null && indexes != null;
         }
 
-        public static readonly PreparedAdd AlreadyAdded = new("AlreadyAdded", null, null, null);
+        public static readonly PreparedAdd AlreadyAdded = new("AlreadyAdded", null, null);
 
         public bool Add()
         {
-            if (_add != null)
+            if (AddTarget != null && Indexes != null)
             {
-                return _add(this);
+                return AddTarget.ApplyPreparedAdd(FilterId, Indexes);
             }
 
             return false;
@@ -33,9 +35,9 @@ namespace Bloomn
 
         public void Dispose()
         {
-            if (Release != null)
+            if (AddTarget != null && Indexes != null)
             {
-                Release(this);
+                AddTarget.Release(FilterId, Indexes);
             }
         }
     }

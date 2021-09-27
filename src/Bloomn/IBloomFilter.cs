@@ -24,7 +24,9 @@ namespace Bloomn
 
     public interface IPreparedAddTarget
     {
-        bool Add(int[] indexes);
+        bool ApplyPreparedAdd(string id, int[] indexes);
+        void Release(string id, int[] indexes);
+        
     }
 
     public static class BloomFilterExtensions

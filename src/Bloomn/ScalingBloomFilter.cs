@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Bloomn
 {
-    public sealed class ScalingBloomFilter<TKey> : IBloomFilter<TKey>
+    public sealed class ScalingBloomFilter<TKey> : IBloomFilter<TKey>, IPreparedAddTarget
     {
         private readonly BloomFilterScaling _bloomFilterScaling;
         private readonly List<FixedSizeBloomFilter<TKey>> _filters = new();
@@ -118,7 +118,7 @@ namespace Bloomn
                     {
                         if (entry.CanAdd)
                         {
-                            ApplyPreparedAdd(entry);
+                            ApplyPreparedAddCore(entry.FilterId, entry.Indexes);
                             return BloomFilterEntry.NotPresent;
                         }
                     }
@@ -150,7 +150,9 @@ namespace Bloomn
             }
         }
 
-        private bool ApplyPreparedAdd(PreparedAdd preparedAdd)
+        bool IPreparedAddTarget.ApplyPreparedAdd(string id, int[] indexes) => ApplyPreparedAddCore(id, indexes);
+        
+        private bool ApplyPreparedAddCore(string id, int[] indexes)
         {
             try
             {
@@ -158,9 +160,9 @@ namespace Bloomn
 
                 var added = false;
 
-                if (_activeFilter.Id == preparedAdd.FilterId)
+                if (_activeFilter.Id == id)
                 {
-                    added = _activeFilter.ApplyPreparedAdd(preparedAdd);
+                    added = _activeFilter.ApplyPreparedAdd(id, indexes);
                 }
                 else
                 {
@@ -171,13 +173,13 @@ namespace Bloomn
                     // disturb the contracts too much to exceed the capacity by a 
                     // small number of entries.
                     foreach (var filter in _filters)
-                        if (filter.Id == preparedAdd.FilterId)
+                        if (filter.Id == id)
                         {
                             var previousBehavior = filter.MaxCapacityBehavior;
                             try
                             {
                                 filter.MaxCapacityBehavior = MaxCapacityBehavior.Ignore;
-                                added = filter.ApplyPreparedAdd(preparedAdd);
+                                added = filter.ApplyPreparedAdd(id, indexes);
                             }
                             finally
                             {
@@ -272,7 +274,7 @@ namespace Bloomn
 
                 if (entry.PreparedAdd.CanAdd)
                 {
-                    return new PreparedAdd(entry.PreparedAdd.FilterId, entry.PreparedAdd.Indexes, ApplyPreparedAdd, entry.PreparedAdd.Release);
+                    return new PreparedAdd(entry.PreparedAdd.FilterId, entry.PreparedAdd.Indexes, this);
                 }
 
                 return PreparedAdd.AlreadyAdded;
@@ -349,6 +351,17 @@ namespace Bloomn
             _metrics.OnCapacityChanged(_filters.Sum(x => x.Parameters.Dimensions.Capacity));
             _metrics.OnBitCountChanged(_filters.Sum(x => x.Parameters.Dimensions.BitCount));
             _metrics.OnScaled(_activeFilter.Parameters);
+        }
+
+
+        public void Release(string id, int[] indexes)
+        {
+            // In the rare case that we've rolled the active filter before an outstanding 
+            // prepared add was released, we'll leak an array. Not a huge deal.
+            if (_activeFilter.Id == id)
+            {
+                _activeFilter.Release(id, indexes);
+            }
         }
     }
 }

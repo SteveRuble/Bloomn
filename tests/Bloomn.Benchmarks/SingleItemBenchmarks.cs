@@ -7,25 +7,26 @@ using BenchmarkDotNet.Attributes;
 
 namespace Bloomn.Benchmarks
 {
-    [SimpleJob(launchCount: 1, warmupCount: 1, targetCount: 5, invocationCount: 100)]
+    [SimpleJob(launchCount: 1, warmupCount: 1, targetCount: 5, invocationCount: 1)]
     [MaxIterationCount(100)]
     [MemoryDiagnoser]
     public class SingleItemBenchmarks
     {
-        public const int OperationsPerInvoke = 1000;
+        public const int OperationsPerInvoke = 100000;
 
         public int KeyIndex { get; set; }
-        public readonly IBloomFilter<int> Fixed;
-        public readonly IBloomFilter<int> Scaling;
+        public IBloomFilter<int> Fixed;
+        public IBloomFilter<int> Scaling;
 
-        public SingleItemBenchmarks()
+        [GlobalSetup]
+        public void SetUp()
         {
             Scaling = BloomFilter.Builder<int>()
-                                 .WithOptions(x => x.WithCapacityAndFalsePositiveProbability(1000, 0.02)
+                                 .WithOptions(x => x.WithCapacityAndFalsePositiveProbability(1000000, 0.02)
                                                     .WithScaling(4, 0.9))
                                  .Build();
             Fixed = BloomFilter.Builder<int>()
-                               .WithOptions(x => x.WithCapacityAndFalsePositiveProbability(1000, 0.02)
+                               .WithOptions(x => x.WithCapacityAndFalsePositiveProbability(1000000, 0.02)
                                                   .WithScaling(4, 0.9))
                                .Build();
 
@@ -99,13 +100,13 @@ namespace Bloomn.Benchmarks
                 KeyIndex++;
                 
                 var prepared = sut.CheckAndPrepareAdd(KeyIndex);
-                {
-                    if (prepared.IsNotPresent)
-                    {
-                        prepared.Add();
-                    }
-                }     
-                prepared.Dispose();
+                // {
+                //     if (prepared.IsNotPresent)
+                //     {
+                //         prepared.Add();
+                //     }
+                // }     
+                 prepared.Dispose();
             }
         }
     }
