@@ -10,7 +10,7 @@ Bloomn provides a modern, high performance bloom filter implementation.
 - Supports scalable bloom filters for scenarios where set size is unknown.
 - Thread safe.
 - High test coverage.
-- Default key hasher handles string, byte[], and numeric types.
+- Default key hasher handles `string`, `byte[]`, `Guid`, and numeric types.
 
 
 ## Examples
@@ -19,6 +19,11 @@ See [tests/Bloomn.Tests/Examples](tests/Bloomn.Tests/Examples)
 
 ### Using Service Provider
 ```c#
+using Bloomn;
+using Bloomn.Extensions;
+
+// ...
+
 Directory.CreateDirectory("./Data");
 const string filePath = "./Data/filter.json";
 
@@ -86,8 +91,9 @@ var filter = BloomFilter.Builder<int>()
 
 For maximum flexibility and performance you can check whether a key is present
 and defer the add until later (so you only need to calculate the hash once).
-This is at least 15% faster than checking and adding as separate operations,
-although it will be more if your key is large. 
+This is a tiny bit faster than checking and adding as separate operations. 
+I designed this API before I figured out some performance improvements that
+made it barely useful.
 
 It's important to dispose of the check result to avoid memory leaks.
 

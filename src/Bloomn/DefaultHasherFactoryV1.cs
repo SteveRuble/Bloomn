@@ -14,7 +14,8 @@ namespace Bloomn
         IKeyHasherFactory<long>,
         IKeyHasherFactory<float>,
         IKeyHasherFactory<double>,
-        IKeyHasherFactory<decimal>
+        IKeyHasherFactory<decimal>,
+        IKeyHasherFactory<Guid>
     {
         Func<int, uint> IKeyHasherFactory<int>.CreateHasher(int seed, int modulus) => key => CreateDeterministicHash(key, seed, modulus);
 
@@ -26,6 +27,18 @@ namespace Bloomn
 
         Func<double, uint> IKeyHasherFactory<double>.CreateHasher(int seed, int modulus) => key => CreateDeterministicHash(key, seed, modulus);
 
+        Func<Guid, uint> IKeyHasherFactory<Guid>.CreateHasher(int seed, int modulus)
+        {
+            var useed = (uint) seed;
+
+            return key =>
+            {
+                Span<byte> g =  stackalloc byte[16];
+                key.TryWriteBytes(g);
+                var h = Compute(g, (uint) g.Length, useed);
+                return (uint) Math.Abs(h % modulus);
+            };            
+        }
 
         Func<byte[], uint> IKeyHasherFactory<byte[]>.CreateHasher(int seed, int modulus)
         {
