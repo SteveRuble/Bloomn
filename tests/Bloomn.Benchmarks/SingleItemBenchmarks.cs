@@ -60,8 +60,8 @@ namespace Bloomn.Benchmarks
                 KeyIndex++;
                 var _ = sut.IsNotPresent(KeyIndex);
             }
-        }     
-        
+        }
+
         [Benchmark(OperationsPerInvoke = OperationsPerInvoke)]
         public void AddAndCheck()
         {
@@ -98,15 +98,15 @@ namespace Bloomn.Benchmarks
             for (int i = 0; i < OperationsPerInvoke; i++)
             {
                 KeyIndex++;
-                
+
                 var prepared = sut.CheckAndPrepareAdd(KeyIndex);
-                // {
-                //     if (prepared.IsNotPresent)
-                //     {
-                //         prepared.Add();
-                //     }
-                // }     
-                 prepared.Dispose();
+                {
+                    if (prepared.IsNotPresent)
+                    {
+                        prepared.Add();
+                    }
+                }
+                prepared.Dispose();
             }
         }
     }

@@ -19,6 +19,7 @@ namespace Bloomn.Tests.Examples
             Directory.CreateDirectory("./Data");
             const string filePath = "./Data/filter.json";
 
+            // Configure the settings for the default bloom filter here:
             var serviceProvider = new ServiceCollection()
                                   .AddBloomFilters<int>(c =>
                                   {
@@ -34,12 +35,16 @@ namespace Bloomn.Tests.Examples
 
             if (File.Exists(filePath))
             {
+                // If a serialized state exists, pass it to the builder here.
+                // The builder will verify that the serialized state matches the
+                // builder configurations provided.
                 var serializedState = File.ReadAllText(filePath);
                 var state = BloomFilterState.Deserialize(serializedState);
                 filter = builder.WithState(state).Build();
             }
             else
             {
+                // If no serialized state exists, we can build and populate the filter:
                 filter = builder.Build();
                 filter.Add(2);
                 filter.Add(3);
@@ -49,6 +54,7 @@ namespace Bloomn.Tests.Examples
                     filter.Add(i);
                 }
 
+                // Export the state and save it for next time:
                 var state = filter.GetState();
                 var serializedState = state.Serialize();
                 File.WriteAllText(filePath, serializedState);

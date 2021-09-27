@@ -108,18 +108,26 @@ namespace Bloomn
 
         public BloomFilterState GetState()
         {
-            var state = new BloomFilterState
+            _lock.EnterReadLock();
+            try
             {
-                Parameters = Parameters,
-                Count = Count,
-                BitArrays = _bitArrays.Select(x =>
+                var state = new BloomFilterState
                 {
-                    var bytes = new byte[_bitsPerSlice];
-                    x.CopyTo(bytes, 0);
-                    return bytes;
-                }).ToList()
-            };
-            return state;
+                    Parameters = Parameters,
+                    Count = Count,
+                    BitArrays = _bitArrays.Select(x =>
+                    {
+                        var bytes = new byte[_bitsPerSlice];
+                        x.CopyTo(bytes, 0);
+                        return bytes;
+                    }).ToList()
+                };
+                return state;
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
         }
 
         internal static int ComputeBitsPerSlice(int bitCount, int hashCount)
