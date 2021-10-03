@@ -51,8 +51,12 @@ namespace Bloomn.Extensions
             {
                 ServiceCollection.Configure<BloomFilterOptions<TKey>>(name, options =>
                 {
-                    var builder = new BloomFilterBuilder<TKey>(options);
+                    var builder = new BloomFilterBuilder<TKey>(options, false);
                     configureOptions(builder);
+                    if (name != Options.DefaultName)
+                    {
+                        options.Profile = name;
+                    }
                 });
             }
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Bloomn.Behaviors;
 using Bloomn.Extensions;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;

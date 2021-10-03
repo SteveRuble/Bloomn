@@ -27,8 +27,7 @@ namespace Bloomn.Tests.Examples
                 var state = BloomFilterState.Deserialize(serializedState);
                 // You can the filter directly from the state, without configuration.
                 // The state will be used to configure it.
-                filter = BloomFilter.Builder<int>()
-                                    .WithState(state)
+                filter = BloomFilter.Builder<int>(state)
                                     .Build();
             }
             else

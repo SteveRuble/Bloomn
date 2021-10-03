@@ -1,3 +1,4 @@
+using Bloomn.Behaviors;
 using FluentAssertions;
 using Xunit;
 

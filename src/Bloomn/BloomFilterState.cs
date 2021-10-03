@@ -17,6 +17,8 @@ namespace Bloomn
         };
 
         public string ApiVersion { get; set; } = "v1";
+        
+        public string? Profile { get; set; }
 
         public BloomFilterParameters? Parameters { get; set; }
 

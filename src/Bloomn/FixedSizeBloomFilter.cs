@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
+using Bloomn.Behaviors;
 
 namespace Bloomn
 {
@@ -27,6 +28,7 @@ namespace Bloomn
 
 
         internal MaxCapacityBehavior MaxCapacityBehavior;
+        private readonly BloomFilterOptions<T> _options;
 
         public FixedSizeBloomFilter(BloomFilterOptions<T> options, BloomFilterState state)
         {
@@ -38,6 +40,8 @@ namespace Bloomn
             state.Parameters.Validate();
 
             Parameters = state.Parameters;
+
+            _options = options;
 
             var hasherFactory = options.GetHasherFactory();
 
@@ -104,6 +108,7 @@ namespace Bloomn
         }
 
         public string Id => Parameters.Id;
+        
         public IBloomFilterDimensions Dimensions => Parameters.Dimensions;
 
         public BloomFilterState GetState()
@@ -113,6 +118,7 @@ namespace Bloomn
             {
                 var state = new BloomFilterState
                 {
+                    Profile = _options.Profile,
                     Parameters = Parameters,
                     Count = Count,
                     BitArrays = _bitArrays.Select(x =>

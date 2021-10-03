@@ -1,15 +1,18 @@
 using System;
 using System.Buffers;
+using Bloomn.Behaviors;
 
 namespace Bloomn
 {
     public class BloomFilterOptions<T>
     {
         public static string DefaultHasherType = typeof(DefaultHasherFactoryV1).AssemblyQualifiedName!;
-       
+
         private IKeyHasherFactory<T>? _keyHasher;
 
         public static BloomFilterOptions<T> DefaultOptions { get; set; } = new();
+
+        public string? Profile { get; set; }
 
         public string HasherType { get; set; } = DefaultHasherType;
 
@@ -19,9 +22,9 @@ namespace Bloomn
 
         public BloomFilterEvents Events { get; set; } = new();
 
-        public bool DiscardInconsistentState { get; set; }
+        public StateValidationBehavior StateValidationBehavior { get; set; }
 
-        public void SetHasher(IKeyHasherFactory<T> hasherFactory)
+        public void SetHasherFactory(IKeyHasherFactory<T> hasherFactory)
         {
             HasherType = hasherFactory.GetType().AssemblyQualifiedName!;
             _keyHasher = hasherFactory;
@@ -55,6 +58,20 @@ namespace Bloomn
             }
 
             return _keyHasher;
+        }
+
+        public BloomFilterOptions<T> Clone()
+        {
+            return new BloomFilterOptions<T>
+            {
+                _keyHasher = _keyHasher,
+                Profile = Profile,
+                HasherType = HasherType,
+                Dimensions = Dimensions,
+                Scaling = Scaling,
+                Events = Events,
+                StateValidationBehavior = StateValidationBehavior,
+            };
         }
     }
 }

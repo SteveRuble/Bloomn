@@ -1,25 +1,61 @@
 using System;
 using System.Linq;
 using System.Text.Json;
+using Bloomn.Behaviors;
 using Microsoft.Extensions.Options;
 
 namespace Bloomn
 {
     internal class BloomFilterBuilder<TKey> : IBloomFilterBuilder<TKey>, IBloomFilterOptionsBuilder<TKey>
     {
-        private bool _validateStateAgainstOptions;
         private readonly IOptionsSnapshot<BloomFilterOptions<TKey>>? _optionsSnapshot;
 
+        /// <summary>
+        /// Create a new builder with an options snapshot allowing use of profiles.
+        /// </summary>
+        /// <param name="options"></param>
         public BloomFilterBuilder(IOptionsSnapshot<BloomFilterOptions<TKey>> options)
         {
-            _validateStateAgainstOptions = true;
             _optionsSnapshot = options;
-            Options = options.Value;
+            Options = options.Value.Clone();
         }
 
-        public BloomFilterBuilder(BloomFilterOptions<TKey> options)
+        /// <summary>
+        /// Create a new builder with the provided options.
+        /// </summary>
+        /// <param name="options"></param>
+        /// <param name="cloneOptions">
+        /// Optional; if true, the provided options will be cloned and any changes made by
+        /// the builder will only be applied to the cloned version. 
+        /// </param>
+        public BloomFilterBuilder(BloomFilterOptions<TKey> options, bool cloneOptions = true)
         {
-            Options = options;
+            if (cloneOptions)
+            {
+                Options = options.Clone();
+            }
+            else
+            {
+                Options = options;
+            }
+        }
+
+        /// <summary>
+        /// Create a new builder with the default options.
+        /// </summary>
+        public BloomFilterBuilder()
+        {
+            Options = BloomFilterOptions<TKey>.DefaultOptions.Clone();
+        }
+
+        /// <summary>
+        /// Create a new builder with the provided state..
+        /// </summary>
+        public BloomFilterBuilder(BloomFilterState state)
+        {
+            State = state;
+            Options = BloomFilterOptions<TKey>.DefaultOptions.Clone();
+            Options.StateValidationBehavior = StateValidationBehavior.PreferStateConfiguration;
         }
 
         internal BloomFilterOptions<TKey> Options { get; set; }
@@ -28,13 +64,11 @@ namespace Bloomn
 
         IBloomFilterOptionsBuilder<TKey> IBloomFilterOptionsBuilder<TKey>.WithCapacityAndFalsePositiveProbability(int capacity, double falsePositiveProbability)
         {
-            _validateStateAgainstOptions = true;
             return WithDimensions(BloomFilterDimensions.ForCapacityAndErrorRate(capacity, falsePositiveProbability));
         }
 
         public IBloomFilterOptionsBuilder<TKey> WithDimensions(BloomFilterDimensions dimensions)
         {
-            _validateStateAgainstOptions = true;
             Options.Dimensions = new BloomFilterDimensionsBuilder
             {
                 FalsePositiveProbability = dimensions.FalsePositiveProbability,
@@ -46,56 +80,61 @@ namespace Bloomn
             return this;
         }
 
-        public IBloomFilterOptionsBuilder<TKey> WithScaling(double capacityScaling = 2, double errorRateScaling = 0.8)
+        public IBloomFilterOptionsBuilder<TKey> WithScaling(double capacityScaling = 2, double falsePositiveProbabilityScaling = 0.8)
         {
-            _validateStateAgainstOptions = true;
             Options.Scaling = new BloomFilterScaling
             {
                 MaxCapacityBehavior = MaxCapacityBehavior.Scale,
                 CapacityScaling = capacityScaling,
-                FalsePositiveProbabilityScaling = errorRateScaling
+                FalsePositiveProbabilityScaling = falsePositiveProbabilityScaling
             };
             return this;
         }
 
-        public IBloomFilterOptionsBuilder<TKey> WithHasher(IKeyHasherFactory<TKey> hasherFactory)
+        public IBloomFilterOptionsBuilder<TKey> WithHasherFactory(IKeyHasherFactory<TKey> hasherFactory)
         {
-            _validateStateAgainstOptions = true;
-            Options.SetHasher(hasherFactory);
+            Options.SetHasherFactory(hasherFactory);
             return this;
         }
 
         public IBloomFilterBuilder<TKey> WithOptions(BloomFilterOptions<TKey> options)
         {
-            _validateStateAgainstOptions = true;
             Options = options;
             return this;
         }
 
         public IBloomFilterBuilder<TKey> WithOptions(Action<IBloomFilterOptionsBuilder<TKey>> configure)
         {
-            _validateStateAgainstOptions = true;
             configure(this);
             return this;
         }
 
-        public IBloomFilterOptionsBuilder<TKey> WithCallbacks(BloomFilterEvents events)
+        public IBloomFilterOptionsBuilder<TKey> WithEventHandlers(BloomFilterEvents events)
         {
-            _validateStateAgainstOptions = true;
             Options.Events = events;
             return this;
         }
 
         public IBloomFilterOptionsBuilder<TKey> IgnoreCapacityLimits()
         {
-            _validateStateAgainstOptions = true;
             Options.Scaling = Options.Scaling with {MaxCapacityBehavior = MaxCapacityBehavior.Ignore};
+            return this;
+        }
+
+        public IBloomFilterOptionsBuilder<TKey> PreferStateConfiguration()
+        {
+            Options.StateValidationBehavior = StateValidationBehavior.PreferStateConfiguration;
+            return this;
+        }
+
+        public IBloomFilterOptionsBuilder<TKey> DiscardInconsistentState()
+        {
+            Options.StateValidationBehavior = StateValidationBehavior.DiscardInconsistentState;
             return this;
         }
 
         public IBloomFilterBuilder<TKey> WithProfile(string profile)
         {
-            _validateStateAgainstOptions = true;
             if (_optionsSnapshot == null)
             {
                 throw new BloomFilterException(BloomFilterExceptionCode.InvalidOptions, "This builder was not acquired from a service provider that could inject options.");
@@ -123,7 +162,7 @@ namespace Bloomn
             };
 
             var state = State;
-            if (state != null && _validateStateAgainstOptions)
+            if (state != null)
             {
                 var parametersFromState = state?.Parameters;
 
@@ -132,26 +171,33 @@ namespace Bloomn
                     var inconsistencies = parametersFromState.Diff(configuredParameters);
                     if (inconsistencies.Any())
                     {
-                        if (Options.DiscardInconsistentState)
+                        switch (Options.StateValidationBehavior)
                         {
-                            state = null;
+                            case StateValidationBehavior.ThrowIfInconsistent:
+                                throw new BloomFilterException(BloomFilterExceptionCode.ParameterMismatch,
+                                    "When state containing parameters are provided it must be consistent with the configured parameters. " +
+                                    $"To change this behavior set {nameof(BloomFilterOptions<TKey>.StateValidationBehavior)} on the options, or " +
+                                    $"use the {nameof(IBloomFilterOptionsBuilder<TKey>.DiscardInconsistentState)} or {nameof(IBloomFilterOptionsBuilder<TKey>.PreferStateConfiguration)} " +
+                                    $"methods on the option builder.\n" +
+                                    $"Configured parameters: {configuredParameters}\n" +
+                                    $"Parameters from state: {parametersFromState}\n" +
+                                    $"Inconsistencies:\n {string.Join("\n ", inconsistencies)}");
+                            case StateValidationBehavior.PreferStateConfiguration:
+                                break;
+                            case StateValidationBehavior.DiscardInconsistentState:
+                                state = null;
+                                break;
+                            default:
+                                throw new BloomFilterException(BloomFilterExceptionCode.InvalidOptions, $"Unsupported state validation behavior {Options.StateValidationBehavior}");
                         }
-
-                        throw new InvalidOperationException("When state containing parameters are provided it must be consistent with the configured parameters. " +
-                                                            $"Configured parameters: {configuredParameters}; " +
-                                                            $"Parameters from state: {parametersFromState}; " +
-                                                            $"Inconsistencies: {string.Join(", ", inconsistencies)}");
                     }
                 }
             }
 
-            if (state == null)
+            state ??= new BloomFilterState
             {
-                state = new BloomFilterState
-                {
-                    Parameters = configuredParameters
-                };
-            }
+                Parameters = configuredParameters
+            };
 
             if (state.Parameters == null)
             {

@@ -117,7 +117,7 @@ namespace Bloomn.Tests
             var fpr = GetFalsePositiveRate(second, 10000);
 
             fpr.Should().BeGreaterThan(0, "there should be some false positives");
-            fpr.Should().BeLessOrEqualTo(parameters.Dimensions.FalsePositiveProbability, "the filter should behave correctly");
+            fpr.Should().BeLessThan(parameters.Dimensions.FalsePositiveProbability + 0.01, "the filter should behave correctly");
         }
     }
 }

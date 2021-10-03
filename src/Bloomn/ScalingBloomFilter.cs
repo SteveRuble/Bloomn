@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
+using Bloomn.Behaviors;
 
 namespace Bloomn
 {
@@ -136,11 +137,12 @@ namespace Bloomn
             {
                 var state = new BloomFilterState
                 {
+                    Profile = _options.Profile,
                     Parameters = Parameters,
-                    Count = Count
+                    Count = Count,
+                    Children = _filters.Select(x => x.GetState()).ToList(),
                 };
 
-                state.Children = _filters.Select(x => x.GetState()).ToList();
 
                 return state;
             }
@@ -151,7 +153,7 @@ namespace Bloomn
         }
 
         bool IPreparedAddTarget.ApplyPreparedAdd(string id, int[] indexes) => ApplyPreparedAddCore(id, indexes);
-        
+
         private bool ApplyPreparedAddCore(string id, int[] indexes)
         {
             try

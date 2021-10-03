@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bloomn.Tests", "tests\Bloom
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bloomn.Benchmarks", "tests\Bloomn.Benchmarks\Bloomn.Benchmarks.csproj", "{D00EC957-A24D-4061-907C-F7E9E24D489C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bloomn.Cli", "examples\Bloomn.Cli\Bloomn.Cli.csproj", "{89A7A037-CFCB-429D-A862-F12256E286C7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{D00EC957-A24D-4061-907C-F7E9E24D489C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D00EC957-A24D-4061-907C-F7E9E24D489C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D00EC957-A24D-4061-907C-F7E9E24D489C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{89A7A037-CFCB-429D-A862-F12256E286C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{89A7A037-CFCB-429D-A862-F12256E286C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{89A7A037-CFCB-429D-A862-F12256E286C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{89A7A037-CFCB-429D-A862-F12256E286C7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
